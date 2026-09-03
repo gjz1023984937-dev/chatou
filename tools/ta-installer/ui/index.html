@@ -8,112 +8,96 @@
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
 <header class="titlebar">
   <div class="title">
     <span class="logo" aria-hidden="true"></span>
-    <span class="brand">神仙鱼<em>TypeAnything</em></span>
+    <span class="brand">TypeAnything <em>Setup</em></span>
   </div>
-  <div class="window-controls" aria-hidden="false">
-    <button class="wc wc-min"   id="wcMin"   type="button" aria-label="最小化">
-      <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
-    </button>
-    <button class="wc wc-close" id="wcClose" type="button" aria-label="关闭">
-      <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 1 L9 9 M9 1 L1 9" stroke="currentColor" stroke-width="1" fill="none"/></svg>
-    </button>
+  <div class="window-controls" aria-label="窗口控制">
+    <button class="wc" id="wcMin" type="button" aria-label="最小化"><svg width="11" height="1" viewBox="0 0 11 1"><rect width="11" height="1" fill="currentColor"/></svg></button>
+    <button class="wc wc-close" id="wcClose" type="button" aria-label="关闭"><svg width="11" height="11" viewBox="0 0 11 11"><path d="M1 1 L10 10 M10 1 L1 10" stroke="currentColor" stroke-width="1.2" fill="none"/></svg></button>
   </div>
 </header>
 
 <main>
-
-  <!-- Step 1: welcome -->
   <section class="page" id="page-welcome">
-    <h1>打中文 → <span class="accent">F8</span> → AI 改写为任意口吻</h1>
-    <p class="sub">
-      装好后任意 Windows 应用按 <code>Win+Space</code> 切过来，按 <code>F8</code> 翻译；Enter 保持正常发送或换行。
-    </p>
+    <div class="hero">
+      <div class="hero-mark"><img src="fish.png" alt="" /></div>
+      <div class="hero-copy">
+        <p class="eyebrow">WELCOME TO TYPEANYTHING</p>
+        <h1>在任何地方，写出更好的表达。</h1>
+        <p class="sub">系统级 AI 输入法。输入中文，按 <kbd>F8</kbd> 即可翻译或改写；<kbd>Enter</kbd> 始终保持原有发送和换行功能。</p>
+      </div>
+    </div>
 
-    <ul class="bullets">
-      <li><strong>OS 级 TSF</strong> — 微信 / Word / Chrome / VSCode 全通</li>
-      <li><strong>BYOK</strong> — 你的 API key 直连，无中转代理</li>
-      <li><strong>装好即用</strong> — 不需重启电脑，新开应用立即生效</li>
-    </ul>
+    <div class="feature-row">
+      <div class="feature"><span class="feature-icon blue">全</span><div><strong>全局可用</strong><small>浏览器、Word、微信等</small></div></div>
+      <div class="feature"><span class="feature-icon violet">AI</span><div><strong>自选模型</strong><small>DeepSeek、OpenAI 等</small></div></div>
+      <div class="feature"><span class="feature-icon green">⌁</span><div><strong>本地直连</strong><small>BYOK，无中转服务器</small></div></div>
+    </div>
 
-    <div class="install-dir-row">
-      <span class="install-dir-label">安装到</span>
-      <span class="install-dir-path" id="installDirPath" title=""></span>
-      <button class="btn ghost btn-tiny" id="btnPickDir">浏览…</button>
+    <div class="install-card">
+      <div class="install-dir-row">
+        <span class="folder-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7.5h7l2 2h9v9H3z"/></svg></span>
+        <div class="install-dir-copy"><span class="install-dir-label">安装位置</span><span class="install-dir-path" id="installDirPath" title="">正在读取默认目录…</span></div>
+        <button class="btn ghost btn-tiny" id="btnPickDir" type="button">更改</button>
+      </div>
     </div>
 
     <div class="actions">
-      <button class="btn ghost" id="btnCancel">取消</button>
-      <button class="btn primary" id="btnStart">开始安装</button>
+      <p class="legal-inline">继续即表示你同意按开源许可证使用本软件。</p>
+      <button class="btn ghost" id="btnCancel" type="button">取消</button>
+      <button class="btn primary" id="btnStart" type="button">安装 TypeAnything <span>→</span></button>
     </div>
   </section>
 
-  <!-- Uninstall confirm page -->
-  <section class="page" id="page-uninstall-welcome" hidden>
-    <h1>卸载 TypeAnything</h1>
-    <p class="sub">
-      将清除安装目录与系统注册项。用户字典与个人配置（<code>%APPDATA%\Rime</code>）会保留，方便日后重装时延用。
-    </p>
-    <div class="actions">
-      <button class="btn ghost" id="btnUninstCancel">取消</button>
-      <button class="btn primary" id="btnUninstStart">确认卸载</button>
+  <section class="page centered" id="page-uninstall-welcome" hidden>
+    <div class="state-icon danger">×</div>
+    <p class="eyebrow">UNINSTALL</p>
+    <h1>卸载 TypeAnything？</h1>
+    <p class="sub">将移除应用与系统注册项，但保留用户字典和个人配置，方便以后重新安装。</p>
+    <div class="notice"><code>%APPDATA%\Rime</code> 中的数据不会被删除。</div>
+    <div class="actions centered-actions">
+      <button class="btn ghost" id="btnUninstCancel" type="button">取消</button>
+      <button class="btn danger-btn" id="btnUninstStart" type="button">确认卸载</button>
     </div>
   </section>
 
-  <!-- Step 2: progress -->
-  <section class="page" id="page-progress" hidden>
-    <p class="eyebrow">INSTALLING</p>
-    <h1>正在安装 …</h1>
-    <p class="sub" id="progressMsg">准备文件 …</p>
-
+  <section class="page centered" id="page-progress" hidden>
+    <div class="state-icon progress-icon"><span></span></div>
+    <p class="eyebrow">SETTING THINGS UP</p>
+    <h1>正在准备 TypeAnything</h1>
+    <p class="sub" id="progressMsg">准备文件…</p>
     <div class="progressbar"><div class="bar" id="bar"></div></div>
-
     <ul class="log" id="log"></ul>
   </section>
 
-  <!-- Step 3: done + guide to model config -->
-  <section class="page" id="page-done" hidden>
-    <p class="eyebrow">INSTALLED</p>
-    <h1>装好了 — <span class="accent">下一步接入 AI</span></h1>
-    <p class="sub">
-      填入 API key 才能跑翻译。默认 DeepSeek，也支持 OpenAI / Moonshot / Ollama 等 OpenAI 兼容 API。
-    </p>
-
-    <p class="legal">
-      <code>Win+Space</code> 切到 TypeAnything。<strong>新打开</strong>的应用立即生效，<strong>已开</strong>的需重启该应用。
-    </p>
-
-    <div class="actions">
-      <button class="btn ghost" id="btnSkip">立即开始</button>
-      <button class="btn primary" id="btnOpenModel">配置模型</button>
+  <section class="page centered" id="page-done" hidden>
+    <div class="state-icon success">✓</div>
+    <p class="eyebrow">READY TO TYPE</p>
+    <h1>安装完成。</h1>
+    <p class="sub">下一步填入 API Key。默认支持 DeepSeek，也可以连接 OpenAI、Moonshot、Ollama 等兼容服务。</p>
+    <div class="notice"><kbd>Win</kbd> + <kbd>Space</kbd> 切换输入法，输入中文后按 <kbd>F8</kbd>。</div>
+    <div class="actions centered-actions">
+      <button class="btn ghost" id="btnSkip" type="button">稍后配置</button>
+      <button class="btn primary" id="btnOpenModel" type="button">配置模型 <span>→</span></button>
     </div>
   </section>
 
-  <!-- Step 3 (reboot variant): pending-on-reboot writes happened. -->
-  <section class="page" id="page-done-reboot" hidden>
-    <p class="eyebrow">INSTALLED — REBOOT REQUIRED</p>
-    <h1>装好了 — <span class="accent">但需要重启电脑生效</span></h1>
-    <p class="sub">
-      部分文件被运行中的旧版锁定，已排队替换。重启后新版自动生效。
-    </p>
-
-    <p class="legal">
-      不重启也能用旧版输入法，但新功能 / 修复需要重启才能加载。
-    </p>
-
-    <div class="actions">
-      <button class="btn ghost" id="btnRebootLater">稍后重启</button>
-      <button class="btn primary" id="btnRebootNow">立即重启</button>
+  <section class="page centered" id="page-done-reboot" hidden>
+    <div class="state-icon reboot">↻</div>
+    <p class="eyebrow">RESTART REQUIRED</p>
+    <h1>安装完成，需要重启。</h1>
+    <p class="sub">部分旧文件正在使用中，新版本已排队替换。重启 Windows 后会自动生效。</p>
+    <div class="notice">不重启仍可使用旧版，但新功能需要重启后加载。</div>
+    <div class="actions centered-actions">
+      <button class="btn ghost" id="btnRebootLater" type="button">稍后重启</button>
+      <button class="btn primary" id="btnRebootNow" type="button">立即重启</button>
     </div>
   </section>
-
 </main>
 
 <div id="toast" class="toast" hidden></div>
-
 <script src="app.js"></script>
 </body>
 </html>
