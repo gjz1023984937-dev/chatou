@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <assemblyIdentity version="0.8.3.0" name="Chatou.Installer"
+  <assemblyIdentity version="0.8.4.0" name="Chatou.Installer"
                     type="win32" processorArchitecture="amd64"/>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>

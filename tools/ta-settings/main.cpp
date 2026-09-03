@@ -22,6 +22,7 @@
 #include <windows.h>
 #include <windowsx.h>   // GET_X_LPARAM / GET_Y_LPARAM (used in NCHITTEST)
 #include <shlobj.h>
+#include <shobjidl.h>
 #include <shellapi.h>
 #include <dwmapi.h>
 #include <winhttp.h>
@@ -661,14 +662,33 @@ static void ApplyMica(HWND hwnd) {
   BOOL dark = FALSE;
   DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof(dark));
 
-  // Hide the icon in the title bar (taskbar icon stays).
+  // The native caption is removed below, so no title-bar icon is visible.
+  // Do not clear WM_SETICON here: that also clears the icon Windows uses for
+  // the taskbar thumbnail/button and makes the old TypeAnything/WebView icon
+  // survive in the shell cache.
   LONG_PTR ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
   SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | WS_EX_DLGMODALFRAME);
-  SendMessageW(hwnd, WM_SETICON, ICON_SMALL, 0);
-  SendMessageW(hwnd, WM_SETICON, ICON_BIG, 0);
   SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
                SWP_NOACTIVATE | SWP_FRAMECHANGED);
+}
+
+static void ApplyChatouWindowIcon(HWND hwnd) {
+  HINSTANCE module = GetModuleHandleW(nullptr);
+  // Keep these handles alive for the lifetime of the process.  LR_SHARED
+  // makes them module-owned, so they must not be destroyed by the caller.
+  HICON icon_small = static_cast<HICON>(LoadImageW(
+      module, MAKEINTRESOURCEW(1), IMAGE_ICON,
+      GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON),
+      LR_DEFAULTCOLOR | LR_SHARED));
+  HICON icon_big = static_cast<HICON>(LoadImageW(
+      module, MAKEINTRESOURCEW(1), IMAGE_ICON,
+      GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON),
+      LR_DEFAULTCOLOR | LR_SHARED));
+  if (icon_small)
+    SendMessageW(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)icon_small);
+  if (icon_big)
+    SendMessageW(hwnd, WM_SETICON, ICON_BIG, (LPARAM)icon_big);
 }
 
 // ───────────────────────── main ──────────────────────────────
@@ -780,6 +800,10 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
     if (register_ime) return SetImeForCurrentUser(false);
     if (unregister_ime) return SetImeForCurrentUser(true);
   }
+
+  // Give the window its own shell identity instead of inheriting the generic
+  // WebView/legacy TypeAnything taskbar group and cached icon.
+  SetCurrentProcessExplicitAppUserModelID(L"Chatou.Settings");
 
   std::string page = GetPageArg();
 
@@ -1116,6 +1140,7 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
                  SWP_NOACTIVATE | SWP_FRAMECHANGED);
   }
+  ApplyChatouWindowIcon(hwnd);
 
   // Clamp the OUTER window rect to the work area (issue #10).
   //
