@@ -3,7 +3,7 @@
 // Mode (set by C++ before app.js loads): window.TA_MODE = "install" | "uninstall".
 //
 // Native bridge:
-//   nativeBeginInstall(dirUtf8)     → kicks off install worker. Progress
+//   nativeBeginInstall(dirUtf8, createDesktopShortcut) → kicks off install worker. Progress
 //                                     streamed via window.installerStatus(json).
 //   nativeBeginUninstall(removeData) → kicks off uninstall worker.
 //   nativePickInstallDir()          → opens folder picker, returns path (or "").
@@ -63,7 +63,13 @@ async function startInstall() {
   showPage("progress");
   $("bar").style.width = "2%";
   $("progressMsg").textContent = "准备中 …";
-  try { await window.nativeBeginInstall(installDir); }
+  const createDesktopShortcut = Boolean($("createDesktopShortcut")?.checked);
+  try {
+    await window.nativeBeginInstall(
+      installDir,
+      createDesktopShortcut ? "1" : "0"
+    );
+  }
   catch (e) {
     $("progressMsg").textContent = "失败：" + (e && e.message || e);
     appendLog(String(e), "error");

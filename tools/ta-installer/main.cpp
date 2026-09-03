@@ -745,6 +745,37 @@ static fs::path StartMenuProgramsAllUsers() {
   return fs::path(root);
 }
 
+static fs::path DesktopForCurrentUser() {
+  // The installer is elevated. Resolve the desktop from Explorer's token so
+  // over-the-shoulder UAC credentials cannot put the shortcut on the admin
+  // account's desktop instead of the signed-in user's desktop.
+  HANDLE user_token = nullptr;
+  HWND shell = GetShellWindow();
+  if (shell) {
+    DWORD shell_pid = 0;
+    GetWindowThreadProcessId(shell, &shell_pid);
+    HANDLE shell_process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION,
+                                       FALSE, shell_pid);
+    if (shell_process) {
+      OpenProcessToken(shell_process, TOKEN_QUERY, &user_token);
+      CloseHandle(shell_process);
+    }
+  }
+
+  PWSTR p = nullptr; std::wstring root;
+  HRESULT hr = SHGetKnownFolderPath(FOLDERID_Desktop, 0, user_token, &p);
+  if (user_token) CloseHandle(user_token);
+  if (FAILED(hr)) {
+    p = nullptr;
+    hr = SHGetKnownFolderPath(FOLDERID_Desktop, 0, NULL, &p);
+  }
+  if (SUCCEEDED(hr) && p) {
+    root = p;
+    CoTaskMemFree(p);
+  }
+  return fs::path(root);
+}
+
 static bool CreateLnk(const fs::path& target_exe,
                       const fs::path& lnk_path,
                       const std::wstring& description) {
@@ -838,6 +869,7 @@ struct InstallOptions {
   std::string api_key;
   std::string target_lang;
   std::wstring install_dir;  // empty -> default
+  bool create_desktop_shortcut = true;
 };
 
 static void DoInstall(InstallOptions opts) {
@@ -858,7 +890,9 @@ static void DoInstall(InstallOptions opts) {
   InstallLog("00. install start",
              "install_dir=" + WideToUtf8(wdir.wstring()) +
              " api_key_set=" + (opts.api_key.empty() ? "no" : "yes") +
-             " target_lang=" + opts.target_lang);
+             " target_lang=" + opts.target_lang +
+             " desktop_shortcut=" +
+                 (opts.create_desktop_shortcut ? "yes" : "no"));
 
   // 1. UAC elevation: by the time we reach DoInstall the embedded
   //    manifest has already required+granted admin; nothing to do here
@@ -1598,7 +1632,7 @@ static void DoInstall(InstallOptions opts) {
                    " copy_ec=" + std::to_string(ec.value()));
 
     // 31. Add/Remove Programs entry.
-    WriteUninstallRegistry(wdir, L"0.8.5");
+    WriteUninstallRegistry(wdir, L"0.8.6");
     // This is an in-place upgrade from TypeAnything. Remove the legacy
     // Add/Remove Programs entry so Windows does not show two products.
     RegDeleteKeyExW(
@@ -1626,6 +1660,34 @@ static void DoInstall(InstallOptions opts) {
     if (!lnk_ok) {
       PushStatus(98, "开始菜单快捷方式创建失败（不影响主功能）",
                  "Start Menu lnk 失败（warning）", "warning");
+    }
+  }
+
+  // 32a. Optional per-user desktop shortcut → settings panel. This is the
+  // visible app entry users expect on the Windows desktop; the Start Menu
+  // shortcut above remains the backend/service launcher.
+  {
+    fs::path desktop = DesktopForCurrentUser();
+    fs::path desktop_lnk = desktop.empty()
+                               ? fs::path()
+                               : desktop / L"Chatou.lnk";
+    bool desktop_ok = !desktop.empty();
+    if (opts.create_desktop_shortcut && desktop_ok) {
+      desktop_ok = CreateLnk(wdir / L"ta-settings.exe", desktop_lnk,
+                             L"打开 Chatou 设置");
+    } else if (!opts.create_desktop_shortcut && desktop_ok) {
+      std::error_code desktop_ec;
+      fs::remove(desktop_lnk, desktop_ec);
+      desktop_ok = !desktop_ec;
+    }
+    InstallLog("32a. desktop shortcut",
+               std::string(desktop_ok ? "ok " : "warning ") +
+                   "enabled=" +
+                   (opts.create_desktop_shortcut ? "yes" : "no") +
+                   " path=" + WideToUtf8(desktop_lnk.wstring()));
+    if (!desktop_ok) {
+      PushStatus(98, "桌面快捷方式创建失败（不影响主功能）",
+                 "Desktop lnk 失败（warning）", "warning");
     }
   }
 
@@ -1850,6 +1912,11 @@ static void DoUninstall(bool remove_user_data) {
   std::error_code shortcut_ec;
   fs::remove(StartMenuProgramsAllUsers() / L"Chatou.lnk", shortcut_ec);
   fs::remove(StartMenuProgramsAllUsers() / L"TypeAnything.lnk", shortcut_ec);
+  fs::path desktop = DesktopForCurrentUser();
+  if (!desktop.empty()) {
+    fs::remove(desktop / L"Chatou.lnk", shortcut_ec);
+    fs::remove(desktop / L"TypeAnything.lnk", shortcut_ec);
+  }
 
   // Restore a pre-existing system DLL when the installer made a backup;
   // otherwise remove Chatou's system copy. Locked files are replaced/deleted
@@ -2101,7 +2168,8 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR lpCmdLine, int) {
     if (installing.exchange(true)) return "false";
     auto p = ParseJsonStringArray(args);
     std::wstring dir = p.empty() ? std::wstring() : Utf8ToWide(p[0]);
-    InstallOptions opts{"", "English", dir};
+    bool create_desktop_shortcut = p.size() < 2 || p[1] != "0";
+    InstallOptions opts{"", "English", dir, create_desktop_shortcut};
     std::thread([opts]() { DoInstall(opts); }).detach();
     return "true";
   });

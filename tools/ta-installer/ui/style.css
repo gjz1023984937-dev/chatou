@@ -59,6 +59,13 @@ kbd { min-width: 27px; height: 21px; display: inline-flex; align-items: center; 
 .install-dir-copy { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 2px; }
 .install-dir-label { color: #344054; font-size: 9.5px; font-weight: 700; }
 .install-dir-path { overflow: hidden; color: var(--muted); font: 9px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.desktop-shortcut-row { min-width: 0; height: 43px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-top: 1px solid var(--line); cursor: pointer; }
+.shortcut-icon { width: 29px; height: 29px; display: grid; flex: 0 0 auto; place-items: center; color: #7652c6; background: #f2edff; border-radius: 8px; }
+.shortcut-icon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
+.shortcut-copy { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 2px; }
+.shortcut-copy strong { color: #344054; font-size: 9.5px; font-weight: 700; }
+.shortcut-copy small { color: var(--muted-2); font-size: 8.5px; }
+.desktop-shortcut-row input { width: 16px; height: 16px; flex: 0 0 auto; accent-color: var(--primary); cursor: pointer; }
 
 .actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: auto; padding-top: 16px; }
 .legal-inline { margin: 0 auto 0 2px; color: var(--muted-2); font-size: 8.5px; }
