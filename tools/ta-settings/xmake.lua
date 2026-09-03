@@ -34,4 +34,7 @@ target("ta-settings")
     local outdir = target:targetdir() .. "/ui"
     os.mkdir(outdir)
     os.cp("ui/*", outdir)
+    -- The installer stages this DLL next to ta-settings.exe. Keep it in the
+    -- normal build output even though this target also links the static loader.
+    os.cp("vendor/webview2/x64/WebView2Loader.dll", target:targetdir())
   end)

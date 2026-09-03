@@ -1,4 +1,4 @@
-// TypeAnything processor — captures committed Chinese, on Enter calls LLM,
+// TypeAnything processor — captures committed Chinese, on F8 calls LLM,
 // replaces accumulated Chinese in the app textbox with translation.
 
 #ifndef TYPEANYTHING_PROCESSOR_H_

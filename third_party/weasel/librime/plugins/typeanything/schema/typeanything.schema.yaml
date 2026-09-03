@@ -1,4 +1,4 @@
-# TypeAnything — pinyin → simplified Chinese → on Enter, LLM translates
+# TypeAnything — pinyin → simplified Chinese → on F8, LLM translates
 # Chinese to the active target language (chosen via tray "Switch Language" menu).
 
 schema:
@@ -8,7 +8,7 @@ schema:
   author:
     - TypeAnything
   description: |
-    Type Chinese pinyin, press Enter, get target-language translation.
+    Type Chinese pinyin, press F8, get target-language translation.
     Switch target language via the tray icon's "Switch Language" menu.
 
 switches:

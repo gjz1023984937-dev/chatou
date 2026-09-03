@@ -2,23 +2,51 @@
 # Run before xmake build.
 
 $ErrorActionPreference = "Stop"
-$here = "D:\hrdai\products\TypeAnything\tools\ta-installer"
+$here = $PSScriptRoot
+$repoRoot = (Resolve-Path (Join-Path $here "..\..")).Path
 $embed = Join-Path $here "embed"
+Set-Location $here
 
 if (Test-Path $embed) { Remove-Item -Recurse -Force $embed }
 New-Item -ItemType Directory -Force -Path $embed,"$embed\target-ui","$embed\install-ui" | Out-Null
 
-# 1. Weasel binaries
-$buildBin = "D:\hrdai\products\TypeAnything\third_party\weasel\build\windows\x64\release"
-Copy-Item "D:\hrdai\products\TypeAnything\third_party\weasel\librime\dist\lib\rime.dll" "$embed\rime.dll"
-Copy-Item "$buildBin\WeaselTSF\weaselx64.dll"           "$embed\weaselx64.dll"
-Copy-Item "$buildBin\WeaselServer\WeaselServer.exe"     "$embed\WeaselServer.exe"
-Copy-Item "$buildBin\WeaselDeployer\WeaselDeployer.exe" "$embed\WeaselDeployer.exe"
+# 1. Weasel binaries. Prefer fresh builds; fall back to the currently
+# installed TypeAnything shell when only librime was rebuilt.
+$buildBin = Join-Path $repoRoot "third_party\weasel\build\windows\x64\release"
+$installedRoot = $env:TYPEANYTHING_INSTALL_DIR
+if (-not $installedRoot) {
+    $runValue = (Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run" `
+        -Name WeaselServer -ErrorAction SilentlyContinue).WeaselServer
+    if ($runValue -match '^"([^"]+)"') { $serverPath = $Matches[1] }
+    elseif ($runValue)                  { $serverPath = $runValue }
+    if ($serverPath -and (Test-Path $serverPath)) { $installedRoot = Split-Path $serverPath }
+}
+if (-not $installedRoot) { $installedRoot = "${env:ProgramFiles}\Rime\weasel-0.17.4" }
+
+$rimeDll = Join-Path $repoRoot "third_party\weasel\librime\dist\lib\rime.dll"
+if (-not (Test-Path $rimeDll)) { throw "Fresh rime.dll not found: $rimeDll" }
+Copy-Item $rimeDll "$embed\rime.dll"
+
+function StageWeaselBinary($buildRelative, $installedName) {
+    $fresh = Join-Path $buildBin $buildRelative
+    $installed = Join-Path $installedRoot $installedName
+    if (Test-Path $fresh)          { Copy-Item $fresh (Join-Path $embed $installedName) }
+    elseif (Test-Path $installed)  { Copy-Item $installed (Join-Path $embed $installedName) }
+    else                           { throw "Weasel binary not found: $installedName" }
+}
+StageWeaselBinary "WeaselTSF\weaselx64.dll" "weaselx64.dll"
+StageWeaselBinary "WeaselServer\WeaselServer.exe" "WeaselServer.exe"
+StageWeaselBinary "WeaselDeployer\WeaselDeployer.exe" "WeaselDeployer.exe"
 
 # 2. ta-settings.exe + loader
-$taBin = "D:\hrdai\products\TypeAnything\tools\ta-settings\build\windows\x64\release"
+$taBin = Join-Path $repoRoot "tools\ta-settings\build\windows\x64\release"
 Copy-Item "$taBin\ta-settings.exe"     "$embed\ta-settings.exe"
-Copy-Item "$taBin\WebView2Loader.dll"  "$embed\WebView2Loader.dll"
+$loader = Join-Path $taBin "WebView2Loader.dll"
+if (-not (Test-Path $loader)) {
+    $loader = Join-Path $repoRoot "tools\ta-settings\vendor\webview2\x64\WebView2Loader.dll"
+}
+if (-not (Test-Path $loader)) { throw "WebView2Loader.dll not found" }
+Copy-Item $loader "$embed\WebView2Loader.dll"
 
 # 3. target ui (for ta-settings to load post-install)
 foreach ($f in "index.html","style.css","app.js","fish.png") {
@@ -31,16 +59,18 @@ foreach ($f in "index.html","style.css","app.js","fish.png") {
 }
 
 # 5. schema yaml template + supplement dict (modern AI/IT/slang terms)
-Copy-Item "D:\hrdai\products\TypeAnything\third_party\weasel\librime\plugins\typeanything\schema\typeanything.schema.yaml" `
-          "$embed\typeanything.schema.yaml"
-Copy-Item "D:\hrdai\products\TypeAnything\third_party\weasel\librime\plugins\typeanything\schema\typeanything.dict.yaml" `
-          "$embed\typeanything.dict.yaml"
+$schemaDir = Join-Path $repoRoot "third_party\weasel\librime\plugins\typeanything\schema"
+Copy-Item "$schemaDir\typeanything.schema.yaml" "$embed\typeanything.schema.yaml"
+$dictSource = Join-Path $schemaDir "typeanything.dict.yaml"
+if (-not (Test-Path $dictSource)) { $dictSource = Join-Path $env:APPDATA "Rime\typeanything.dict.yaml" }
+if (-not (Test-Path $dictSource)) { throw "typeanything.dict.yaml not found" }
+Copy-Item $dictSource "$embed\typeanything.dict.yaml"
 
 # 6. Rime base data — required on cold machines (no prior Weasel install).
 #    Prefer the installed Weasel data dir (has key_bindings/punctuation that
 #    librime/data/minimal/ lacks). Fall back to minimal/ for files missing.
-$pfData = "C:\Program Files\Rime\weasel-0.17.4\data"
-$minData = "D:\hrdai\products\TypeAnything\third_party\weasel\librime\data\minimal"
+$pfData = Join-Path $installedRoot "data"
+$minData = Join-Path $repoRoot "third_party\weasel\librime\data\minimal"
 function StageDataFile($name) {
     $pf  = Join-Path $pfData $name
     $min = Join-Path $minData $name
@@ -87,14 +117,13 @@ $rcExe = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Directory -
              $candidate = Join-Path $_.FullName "x64\rc.exe"
              if (Test-Path $candidate) { return $candidate }
          } | Select-Object -First 1
-$cvtres = Get-ChildItem "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC" -Directory -ErrorAction SilentlyContinue |
-          Sort-Object Name -Descending | ForEach-Object {
-              $candidate = Join-Path $_.FullName "bin\HostX64\x64\cvtres.exe"
-              if (Test-Path $candidate) { return $candidate }
-          } | Select-Object -First 1
+$cvtres = Get-ChildItem "${env:ProgramFiles(x86)}\Microsoft Visual Studio" -Recurse `
+          -Filter cvtres.exe -File -ErrorAction SilentlyContinue |
+          Where-Object { $_.FullName -match '\\bin\\Host[xX]64\\x64\\cvtres\.exe$' } |
+          Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
 
 if (-not $rcExe)   { throw "rc.exe not found (need Windows SDK)" }
-if (-not $cvtres)  { throw "cvtres.exe not found (need VS2022 BuildTools)" }
+if (-not $cvtres)  { throw "cvtres.exe not found (need Visual Studio C++ build tools)" }
 
 Write-Host "==> rc.exe : $rcExe"
 Write-Host "==> cvtres : $cvtres"

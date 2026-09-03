@@ -150,6 +150,19 @@ STDAPI WeaselTSF::OnPreservedKey(ITfContext* pContext,
                                  REFGUID rguid,
                                  BOOL* pfEaten) {
   *pfEaten = FALSE;
+  if (!IsEqualGUID(rguid, GUID_IME_MODE_PRESERVED_KEY))
+    return S_OK;
+
+  // Function keys are commonly handled as application accelerators before
+  // the normal TSF key-event sink sees them. Registering F8 as a preserved
+  // key routes it here while Weasel is active. Feed the same IBus keysym to
+  // librime that ConvertKeyEvent(VK_F8, ...) would have produced.
+  if (!_EnsureServerConnected())
+    return S_OK;
+
+  weasel::KeyEvent key(ibus::F8, ibus::NULL_MASK);
+  *pfEaten = m_client.ProcessKeyEvent(key) ? TRUE : FALSE;
+  _UpdateComposition(pContext);
   return S_OK;
 }
 
@@ -176,26 +189,39 @@ void WeaselTSF::_UninitKeyEventSink() {
 }
 
 BOOL WeaselTSF::_InitPreservedKey() {
-  return TRUE;
-#if 0
-	com_ptr<ITfKeystrokeMgr> pKeystrokeMgr;
-	if (_pThreadMgr->QueryInterface(pKeystrokeMgr.GetAddressOf()) != S_OK)
-	{
-		return FALSE;
-	}
-	TF_PRESERVEDKEY preservedKeyImeMode;
+  com_ptr<ITfKeystrokeMgr> pKeystrokeMgr;
+  if (_pThreadMgr->QueryInterface(&pKeystrokeMgr) != S_OK)
+    return FALSE;
 
-	/* Define SHIFT ONLY for now */
-	preservedKeyImeMode.uVKey = VK_SHIFT;
-	preservedKeyImeMode.uModifiers = TF_MOD_ON_KEYUP;
+  TF_PRESERVEDKEY preservedKey = {};
+  preservedKey.uVKey = VK_F8;
+  preservedKey.uModifiers = 0;
+  static const WCHAR description[] = L"TypeAnything AI translation";
 
-	auto hr = pKeystrokeMgr->PreserveKey(
-		_tfClientId,
-		GUID_IME_MODE_PRESERVED_KEY,
-		&preservedKeyImeMode, L"", 0);
-	
-	return SUCCEEDED(hr);
-#endif
+  // Clear a stale registration left by an earlier activation in the same
+  // process, then install the current one.
+  pKeystrokeMgr->UnpreserveKey(GUID_IME_MODE_PRESERVED_KEY,
+                               &preservedKey);
+  HRESULT hr = pKeystrokeMgr->PreserveKey(
+      _tfClientId,
+      GUID_IME_MODE_PRESERVED_KEY,
+      &preservedKey,
+      description,
+      ARRAYSIZE(description) - 1);
+  return SUCCEEDED(hr);
 }
 
-void WeaselTSF::_UninitPreservedKey() {}
+void WeaselTSF::_UninitPreservedKey() {
+  if (!_pThreadMgr || _tfClientId == TF_CLIENTID_NULL)
+    return;
+
+  com_ptr<ITfKeystrokeMgr> pKeystrokeMgr;
+  if (_pThreadMgr->QueryInterface(&pKeystrokeMgr) != S_OK)
+    return;
+
+  TF_PRESERVEDKEY preservedKey = {};
+  preservedKey.uVKey = VK_F8;
+  preservedKey.uModifiers = 0;
+  pKeystrokeMgr->UnpreserveKey(GUID_IME_MODE_PRESERVED_KEY,
+                               &preservedKey);
+}

@@ -16,7 +16,7 @@ target("WeaselTSF")
   set_filename(fname)
 
   add_files("$(projectdir)/PerMonitorHighDPIAware.manifest")
-  add_shflags("/DEBUG /OPT:REF /OPT:ICF")
+  add_shflags("/DEBUG /OPT:REF /OPT:ICF /LTCG /INCREMENTAL:NO")
   before_build(function(target)
     local target_dir = path.join(target:targetdir(), target:name())
     if not os.exists(target_dir) then

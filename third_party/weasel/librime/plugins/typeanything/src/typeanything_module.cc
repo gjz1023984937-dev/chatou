@@ -1,6 +1,6 @@
 // TypeAnything Rime plugin — module registration.
 //
-// Registers our custom processor that intercepts Enter to translate the
+// Registers our custom processor that intercepts F8 to translate the
 // committed Chinese composition into a target language via DeepSeek API.
 
 #include <rime_api.h>

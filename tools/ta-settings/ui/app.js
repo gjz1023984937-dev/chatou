@@ -259,7 +259,7 @@ async function initLangPage() {
         return;
       }
       // Free-form input — classify via one LLM call, store as "X:name" so
-      // the plugin picks the right category prompt at Enter. On failure
+      // the plugin picks the right category prompt when F8 is pressed. On failure
       // we keep the old lang.txt; we don't silently default to a guess.
       const orig = saveBtn.textContent;
       saveBtn.textContent = "分类中…";
@@ -428,7 +428,7 @@ async function initModelPage() {
   });
 
   // Save. API Key allowed to be empty — clearing it explicitly de-activates
-  // that provider (runtime will get 401 / endpoint reject on next Enter,
+  // that provider (runtime will get 401 / endpoint reject on next F8,
   // which is the user's intent if they just want to stop using that key).
   document.getElementById("btnSaveModel").addEventListener("click", async () => {
     const saveBtn = document.getElementById("btnSaveModel");

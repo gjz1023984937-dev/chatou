@@ -1183,7 +1183,8 @@ static void DoInstall(InstallOptions opts) {
     }
 
     // 14. Seed lang.txt with target + category prefix (so ResolveTargetLang has
-    // something on Enter before user opens the settings panel). Default is
+    // something when F8 is pressed before the user opens the settings panel).
+    // Default is
     // "A:English" (A = NATURAL_LANGUAGE category, English target).
     {
       std::ofstream lf(udir / L"typeanything_lang.txt",

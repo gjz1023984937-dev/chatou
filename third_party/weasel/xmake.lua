@@ -14,10 +14,13 @@ add_includedirs("$(projectdir)/include")
 boost_root = os.getenv("BOOST_ROOT") or "C:/local/boost_1_84_0"
 boost_include_path = boost_root
 -- Prefer prebuilt binaries (lib64-msvc-14.3) when present.
-local prebuilt_x64 = boost_root .. "/lib64-msvc-14.3"
 boost_lib_path = boost_root .. "/stage/lib"
-if os.exists(prebuilt_x64) then
-  boost_lib_path = prebuilt_x64
+for _, toolset in ipairs({"14.3", "14.2"}) do
+  local prebuilt_x64 = boost_root .. "/lib64-msvc-" .. toolset
+  if os.exists(prebuilt_x64) then
+    boost_lib_path = prebuilt_x64
+    break
+  end
 end
 add_includedirs(boost_include_path)
 add_linkdirs(boost_lib_path)

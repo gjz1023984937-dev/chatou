@@ -2,7 +2,7 @@
 //
 // Flow:
 //   * commit_notifier hook accumulates Chinese commits.
-//   * On Enter (no active composition, accumulated non-empty):
+//   * On F8 (no active composition, accumulated non-empty):
 //       1. spawn worker thread to call LLM (Chinese stays visible in app)
 //       2. when LLM returns, delete the original Chinese chars and paste
 //          translation via clipboard + Ctrl+V
@@ -38,7 +38,7 @@
 namespace typeanything {
 
 // Languages supported. Tray "Switch Language" submenu writes the chosen code
-// to %APPDATA%\Rime\typeanything_lang.txt; plugin reads it on each Enter.
+// to %APPDATA%\Rime\typeanything_lang.txt; plugin reads it on each F8.
 struct LangEntry {
   const char* code;
   const char* full_name;   // used in LLM prompt
@@ -349,8 +349,8 @@ size_t Utf8CodePointCount(const std::string& s) {
   return count;
 }
 
-void SendBackspaces(int count) {
-  if (count <= 0) return;
+bool SendBackspaces(int count) {
+  if (count <= 0) return true;
   std::vector<INPUT> inputs(count * 2);
   for (int i = 0; i < count; ++i) {
     inputs[i * 2].type = INPUT_KEYBOARD;
@@ -359,7 +359,8 @@ void SendBackspaces(int count) {
     inputs[i * 2 + 1].ki.wVk = VK_BACK;
     inputs[i * 2 + 1].ki.dwFlags = KEYEVENTF_KEYUP;
   }
-  SendInput((UINT)inputs.size(), inputs.data(), sizeof(INPUT));
+  return SendInput((UINT)inputs.size(), inputs.data(), sizeof(INPUT)) ==
+         inputs.size();
 }
 
 bool SetClipboardUtf8(const std::string& utf8) {
@@ -367,6 +368,7 @@ bool SetClipboardUtf8(const std::string& utf8) {
   // Retry — clipboard may briefly be locked.
   for (int attempt = 0; attempt < 5; ++attempt) {
     if (OpenClipboard(nullptr)) {
+      bool success = false;
       EmptyClipboard();
       size_t bytes = (w.size() + 1) * sizeof(wchar_t);
       HGLOBAL h = GlobalAlloc(GMEM_MOVEABLE, bytes);
@@ -378,13 +380,15 @@ bool SetClipboardUtf8(const std::string& utf8) {
           // On success the system owns h; only free it if we keep ownership.
           if (!SetClipboardData(CF_UNICODETEXT, h)) {
             GlobalFree(h);
+          } else {
+            success = true;
           }
         } else {
           GlobalFree(h);  // GlobalLock failed — h is still ours
         }
       }
       CloseClipboard();
-      return true;
+      if (success) return true;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
   }
@@ -410,7 +414,7 @@ bool LaunchTaSettingsModelPage() {
   return (INT_PTR)h > 32;
 }
 
-void SendPaste() {
+bool SendPaste() {
   INPUT in[4] = {};
   in[0].type = INPUT_KEYBOARD;
   in[0].ki.wVk = VK_CONTROL;
@@ -422,7 +426,7 @@ void SendPaste() {
   in[3].type = INPUT_KEYBOARD;
   in[3].ki.wVk = VK_CONTROL;
   in[3].ki.dwFlags = KEYEVENTF_KEYUP;
-  SendInput(4, in, sizeof(INPUT));
+  return SendInput(4, in, sizeof(INPUT)) == 4;
 }
 
 }  // namespace
@@ -598,7 +602,18 @@ rime::ProcessResult TypeAnythingProcessor::ProcessKeyEvent(
     }
   }
 
-  if (key_event.keycode() != XK_Return) return rime::kNoop;
+  // Enter now belongs entirely to the host application. If no Rime
+  // composition is active, it marks a submit/new-paragraph boundary, so do
+  // not carry committed text into the next field or message.
+  if ((key_event.keycode() == XK_Return ||
+       key_event.keycode() == XK_KP_Enter) &&
+      !key_event.release()) {
+    rime::Context* ctx = engine_->context();
+    if (!ctx || !ctx->IsComposing()) accumulated_.clear();
+    return rime::kNoop;
+  }
+
+  if (key_event.keycode() != XK_F8) return rime::kNoop;
   if (accumulated_.empty()) return rime::kNoop;
 
   rime::Context* ctx = engine_->context();
@@ -606,7 +621,7 @@ rime::ProcessResult TypeAnythingProcessor::ProcessKeyEvent(
 
   // No API key configured: surface the model-config panel instead of silently
   // dropping the user's input. We still consume the accumulated buffer so the
-  // host app doesn't get a stray Enter inserting a newline next to Chinese.
+  // host app doesn't receive the F8 translation trigger.
   if (api_key_.empty()) {
     TranslateLogRec rec;
     rec.target_lang = ResolveTargetLang();
@@ -623,8 +638,7 @@ rime::ProcessResult TypeAnythingProcessor::ProcessKeyEvent(
   }
 
   // Pure mode (user toggled "纯净模式" in lang picker): drop the
-  // accumulated buffer but return kNoop so Enter falls through to the
-  // host app — gives normal newline/submit behavior.
+  // accumulated buffer but return kNoop so F8 falls through to the host app.
   {
     std::string lang_now = ResolveTargetLang();
     if (lang_now == "off" || lang_now == "Off" || lang_now == "none" ||
@@ -771,13 +785,13 @@ void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
 
     bool send_ok = false;
     if (SetClipboardUtf8(english)) {
-      SendBackspaces((int)chinese_chars);
-      std::this_thread::sleep_for(std::chrono::milliseconds(30));
-      SendPaste();
-      send_ok = true;
+      bool deleted = SendBackspaces((int)chinese_chars);
+      std::this_thread::sleep_for(std::chrono::milliseconds(80));
+      bool pasted = SendPaste();
+      send_ok = deleted && pasted;
     }
     log_rec.send_input_ok = send_ok;
-    log_rec.result = send_ok ? "ok" : "clipboard-fail";
+    log_rec.result = send_ok ? "ok" : "clipboard-or-input-injection-fail";
     std::this_thread::sleep_for(std::chrono::milliseconds(150));
     suppress_capture_.store(false);
     TranslateLog(std::move(log_rec));

@@ -1,7 +1,7 @@
 # TypeAnything
 
 > **打拼音，落地任何语言、任何圈层、任何风格。**
-> Type Chinese pinyin → press Enter → AI rewrites it as English / 留学生式中英夹杂 / 金融式说话 / 学术体 / 港片台词 / Klingon — anything you can describe.
+> Type Chinese pinyin → press F8 → AI rewrites it as English / 留学生式中英夹杂 / 金融式说话 / 学术体 / 港片台词 / Klingon — anything you can describe. Enter remains the host application's normal submit/newline key.
 
 [![IME](https://img.shields.io/badge/Windows-IME-blueviolet)](https://learn.microsoft.com/en-us/windows/win32/tsf/text-services-framework)
 [![Built on](https://img.shields.io/badge/Built%20on-Weasel%20%2B%20librime-orange)](https://github.com/rime/weasel)
@@ -37,7 +37,7 @@
 
 ## 它是什么
 
-Windows OS 级输入法。你打拼音 → 空格选词 → Enter → 中文当场被 AI 改写为目标语言或风格 → 在**任意 Windows 应用**（微信 / Word / Chrome / VSCode / 飞书 / Discord / Slack）原地替换。
+Windows OS 级输入法。你打拼音 → 空格选词 → F8 → 中文当场被 AI 改写为目标语言或风格 → 在**任意 Windows 应用**（微信 / Word / Chrome / VSCode / 飞书 / Discord / Slack）原地替换。Enter 保持宿主应用原本的发送/换行行为。
 
 切换 target 不重启：托盘鱼图标右键 → **切换语言** → 弹框 → 输入任何描述。
 
@@ -96,7 +96,7 @@ Klingon battle prose / 火星文 / Spanish chilango / Cockney slang
 |------|--------------------|
 | 翻译插件只做语种切换（中→英） | **AI 改写**：语种 / 圈层 / 时代 / 文体 / 自定义任意切 |
 | 浏览器插件方案只在 web 内有效 | **OS 级 TSF**，微信/Word/任何原生 app 都生效 |
-| 「划词翻译」要先打中文再选 → 中断思路 | **打字过程内联**，Enter 当场替换，零额外动作 |
+| 「划词翻译」要先打中文再选 → 中断思路 | **打字过程内联**，F8 当场替换，零额外动作 |
 | sidecar / hook 方案微信里出现幽灵光标 | **直接 fork Weasel TSF**，框架级集成无 hook 冲突 |
 | 谷歌输入法 + 翻译只支持 1-2 语言 | **任意自然语言描述**，1 秒切换风格 |
 | 翻译质量靠默认 prompt（直译生硬） | **5 条 rule 专业翻译 prompt** + 风格描述 pass-through |
@@ -117,7 +117,7 @@ Klingon battle prose / 火星文 / Spanish chilango / Cockney slang
 │   ↓ commit_notifier 触发                            │
 │  TypeAnything Rime processor 累积「你好」           │
 └─────────────────────────────────────────────────────┘
-                      ↓ [Enter]
+                      ↓ [F8]
 ┌─ 后台异步 ──────────────────────────────────────────┐
 │  spawn worker thread (Chinese 仍可见 ~1s)           │
 │   ↓                                                 │
@@ -214,7 +214,7 @@ cd ..\ta-installer
 1. Win+Space 切到 TypeAnything
 2. 任意输入框打拼音：women xia zhou yao kaihui
 3. Space 选词 → 「我们下周要开会」
-4. Enter → 中文消失 → 落地为目标风格
+4. F8 → 中文消失 → 落地为目标风格（Enter 仍正常发送/换行）
 ```
 
 ### 托盘菜单（右键鱼图标 / TSF 输入法图标）
@@ -236,7 +236,7 @@ cd ..\ta-installer
 - **🎬 场景 / 文体** — 学术英语 / 商务日语 / 古汉语风格 / 网络流行语 / 知乎体 / 小红书种草体 / 公众号文章体 / B 站弹幕体 / 抖音口播体 / 营销号体
 - **🪐 虚构 / 自定义** — 像鲁迅一样的英语 / 像周杰伦歌词 / 港片黑帮台词 / Klingon battle prose / Spanish chilango / 火星文 / ...
 
-也可在输入框直接键入任意描述（默认 placeholder `English`，留空即默认）。保存后写到 `%APPDATA%\Rime\typeanything_lang.txt`，下次 Enter 触发翻译时 processor 重读文件，AI 按新描述翻译。
+也可在输入框直接键入任意描述（默认 placeholder `English`，留空即默认）。保存后写到 `%APPDATA%\Rime\typeanything_lang.txt`，下次 F8 触发翻译时 processor 重读文件，AI 按新描述翻译。
 
 ### 模型配置（接入自己的模型）
 
@@ -363,7 +363,7 @@ typeanything:
 - **macOS / Linux 暂不支持** — 需用 squirrel (macOS) / fcitx-rime (Linux) 重新 fork
 - **新打开的应用立即生效，已开的应用需关掉重开** — TSF DLL 被每个文本输入进程持锁；installer 走 `MoveFileEx` pending-on-reboot 兜底，**整机重启不需要**
 - **WebView2 runtime 依赖** — 设置面板用 Edge WebView2。Win10 20H1+ / Win11 默认装；老 Win10 (1909/1903) 需手动装一次
-- **切换风格只影响下次 Enter** — processor 在 Enter 触发时才重读 `typeanything_lang.txt`，已落地的文本不回译
+- **切换风格只影响下次 F8** — processor 在 F8 触发时才重读 `typeanything_lang.txt`，已落地的文本不回译
 - **首次启动 schema 编译 ~3-5s** — librime 首次编译 `luna_pinyin.table.bin` (13MB)，仅一次性
 
 ---
@@ -387,7 +387,7 @@ typeanything:
 - **死配置清理**：从 schema translators 列表移除 `reverse_lookup_translator`（从 luna_pinyin 模板继承的死配置，无对应 `reverse_lookup` 配置块）
 
 ### v0.7.0
-- **4 类提示词路由 + 保存时分类**：风格描述在用户保存时由 LLM 分类到 4 类（A=自然语种 / B=中式风格 / C=跨语种 / D=暗语编码），打上 `X:name` 前缀写入 `lang.txt`。Enter 触发翻译时 processor 按前缀挑对应专用 prompt — 比通用 prompt 翻译质量提升（avg eval 6.5 → 8.2），LLM 调用 5× 便宜
+- **4 类提示词路由 + 保存时分类**：风格描述在用户保存时由 LLM 分类到 4 类（A=自然语种 / B=中式风格 / C=跨语种 / D=暗语编码），打上 `X:name` 前缀写入 `lang.txt`。翻译触发时 processor 按前缀挑对应专用 prompt — 比通用 prompt 翻译质量提升（avg eval 6.5 → 8.2），LLM 调用 5× 便宜
 - **运行时 prompts 文件**：4 个 category prompt + 1 个 classify prompt 拆到 `%APPDATA%\Rime\typeanything_prompts.txt`（UTF-8），改 prompt 不再需要 librime 重 build；同时解决 MSVC cp936 源码字符集问题
 - **40 chip 提示词重做**：基于 4 类架构重写 chip 列表，砍 11 低价值 chip + 加 10 高频 chip（如港片黑帮 / 知乎大佬腔 / 鲁迅式中文）+ 3 个改名
 - **Claude UI 风格**：设置面板从 hrdai dark editorial 改为 Claude 暖灰咖（v0.7.3 又改为蓝白）
@@ -405,7 +405,7 @@ typeanything:
 - **`taskkill /T` flag 去掉**：避免 ta-settings（WeaselServer 子进程）被一起 kill
 
 ### v0.6.2
-- **纯净模式** — 标题栏右侧 toggle 开关，开启后写 `off` sentinel 到 lang 文件，UI 整体置灰锁定，Enter 直通宿主（不再被 IME 吞掉），实际效果 = 纯拼音中文输入法。模型配置页不显示该开关。
+- **纯净模式** — 标题栏右侧 toggle 开关，开启后写 `off` sentinel 到 lang 文件，UI 整体置灰锁定并停用 F8 翻译，实际效果 = 纯拼音中文输入法。模型配置页不显示该开关。
 - **UI 收尾打磨**
   - chip 点击后输入框光标置末尾、无蓝色高亮（`setSelectionRange(n,n)` 替代 `select()`）
   - 用户手动编辑或聚焦时清除 chip 的 active 高亮
