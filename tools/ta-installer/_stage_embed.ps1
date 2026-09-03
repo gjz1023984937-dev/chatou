@@ -59,24 +59,31 @@ foreach ($f in "index.html","style.css","app.js","chatou.png") {
     Copy-Item "$here\ui\$f" "$embed\install-ui\$f"
 }
 
-# 5. schema yaml template + supplement dict (modern AI/IT/slang terms)
+# 5. schema yaml template + supplement dict (modern AI/IT/slang terms).
+#    Both are tracked source assets; never depend on a developer's APPDATA.
 $schemaDir = Join-Path $repoRoot "third_party\weasel\librime\plugins\typeanything\schema"
 Copy-Item "$schemaDir\typeanything.schema.yaml" "$embed\typeanything.schema.yaml"
 $dictSource = Join-Path $schemaDir "typeanything.dict.yaml"
-if (-not (Test-Path $dictSource)) { $dictSource = Join-Path $env:APPDATA "Rime\typeanything.dict.yaml" }
 if (-not (Test-Path $dictSource)) { throw "typeanything.dict.yaml not found" }
 Copy-Item $dictSource "$embed\typeanything.dict.yaml"
 
 # 6. Rime base data — required on cold machines (no prior Weasel install).
-#    Prefer the installed Weasel data dir (has key_bindings/punctuation that
-#    librime/data/minimal/ lacks). Fall back to minimal/ for files missing.
+#    A release-tested, compressed snapshot lives under assets/ so packaging
+#    remains reproducible without bloating Git history with generated dictionaries.
+$assetArchive = Join-Path $here "assets\rime-data.zip"
+$assetExtract = Join-Path $embed "source-assets"
+if (-not (Test-Path $assetArchive)) { throw "Bundled Rime data archive not found: $assetArchive" }
+Expand-Archive -LiteralPath $assetArchive -DestinationPath $assetExtract -Force
+$assetData = Join-Path $assetExtract "data"
 $pfData = Join-Path $installedRoot "data"
 $minData = Join-Path $repoRoot "third_party\weasel\librime\data\minimal"
 function StageDataFile($name) {
+    $asset = Join-Path $assetData $name
     $pf  = Join-Path $pfData $name
     $min = Join-Path $minData $name
     $dst = Join-Path $embed $name
-    if (Test-Path $pf)        { Copy-Item $pf  $dst }
+    if (Test-Path $asset)     { Copy-Item $asset $dst }
+    elseif (Test-Path $pf)    { Copy-Item $pf  $dst }
     elseif (Test-Path $min)   { Copy-Item $min $dst }
     else                      { throw "data file not found: $name" }
 }
@@ -97,14 +104,15 @@ StageDataFile "weasel.yaml"
 #     traditional luna_pinyin output passes through unconverted AND the
 #     candidate generation chain errors out → empty candidate window.
 #     Only the t2s (繁→简) chain is needed: t2s.json + TSPhrases + TSCharacters.
-$opencc = Join-Path $pfData "opencc"
+$opencc = Join-Path $assetExtract "opencc"
 $openccDst = Join-Path $embed "opencc"
 New-Item -ItemType Directory -Force -Path $openccDst | Out-Null
 foreach ($f in "t2s.json","TSPhrases.ocd2","TSCharacters.ocd2") {
     $srcF = Join-Path $opencc $f
-    if (-not (Test-Path $srcF)) { throw "OpenCC data missing: $srcF (install official 小狼毫 once to get opencc/)" }
+    if (-not (Test-Path $srcF)) { throw "OpenCC data missing: $srcF" }
     Copy-Item $srcF (Join-Path $openccDst $f)
 }
+Remove-Item -LiteralPath $assetExtract -Recurse -Force
 
 # 7. Translate / classify prompts (UTF-8). Source of truth = embed_prompts.txt
 #    (generated from tools/eval/run_eval.py validated prompts).

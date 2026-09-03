@@ -55,8 +55,12 @@
     <div class="state-icon danger">×</div>
     <p class="eyebrow">UNINSTALL</p>
     <h1>卸载 Chatou？</h1>
-    <p class="sub">将移除应用与系统注册项，但保留用户字典和个人配置，方便以后重新安装。</p>
-    <div class="notice"><code>%APPDATA%\Rime</code> 中的数据不会被删除。</div>
+    <p class="sub">默认彻底清除应用、输入法注册、缓存、用户字典与模型配置。</p>
+    <label class="uninstall-option">
+      <input id="keepUserData" type="checkbox" />
+      <span><strong>保留个人数据</strong><small>保留用户字典和模型配置，方便以后重新安装</small></span>
+    </label>
+    <div class="notice">正在使用的输入法文件将在重启 Windows 后自动删除。</div>
     <div class="actions centered-actions">
       <button class="btn ghost" id="btnUninstCancel" type="button">取消</button>
       <button class="btn danger-btn" id="btnUninstStart" type="button">确认卸载</button>
@@ -89,7 +93,7 @@
     <p class="eyebrow">RESTART REQUIRED</p>
     <h1>安装完成，需要重启。</h1>
     <p class="sub">部分旧文件正在使用中，新版本已排队替换。重启 Windows 后会自动生效。</p>
-    <div class="notice">不重启仍可使用旧版，但新功能需要重启后加载。</div>
+    <div class="notice" id="rebootNotice">不重启仍可使用旧版，但新功能需要重启后加载。</div>
     <div class="actions centered-actions">
       <button class="btn ghost" id="btnRebootLater" type="button">稍后重启</button>
       <button class="btn primary" id="btnRebootNow" type="button">立即重启</button>

@@ -5,7 +5,7 @@
 // Native bridge:
 //   nativeBeginInstall(dirUtf8)     → kicks off install worker. Progress
 //                                     streamed via window.installerStatus(json).
-//   nativeBeginUninstall()          → kicks off uninstall worker.
+//   nativeBeginUninstall(removeData) → kicks off uninstall worker.
 //   nativePickInstallDir()          → opens folder picker, returns path (or "").
 //   nativeDefaultInstallDir()       → returns the prefill path for the picker.
 //   nativeOpenSettings(page)        → spawns ta-settings.exe --page <model|lang>
@@ -71,7 +71,13 @@ async function startInstall() {
 }
 
 async function startUninstall() {
+  const keepUserData = Boolean($("keepUserData")?.checked);
+  const removeUserData = !keepUserData;
   showPage("progress");
+  const progressEyebrow = document.querySelector("#page-progress .eyebrow");
+  const progressTitle = document.querySelector("#page-progress h1");
+  if (progressEyebrow) progressEyebrow.textContent = "REMOVING CHATOU";
+  if (progressTitle) progressTitle.textContent = "正在卸载 Chatou";
   $("progressMsg").textContent = "准备中 …";
   $("bar").style.width = "2%";
   // Repaint done page text for uninstall flow.
@@ -79,7 +85,11 @@ async function startUninstall() {
   const doneSub = document.querySelector("#page-done .sub");
   const doneLegal = document.querySelector("#page-done .legal");
   if (doneTitle) doneTitle.innerHTML = "卸载完成。";
-  if (doneSub)   doneSub.textContent = "Chatou 已从系统移除。用户字典与个人配置已保留。";
+  if (doneSub) {
+    doneSub.textContent = keepUserData
+      ? "Chatou 已从系统移除。用户字典与模型配置已保留。"
+      : "Chatou、用户字典、模型配置和缓存均已清除。";
+  }
   if (doneLegal) doneLegal.remove();
   const btnPrimary = $("btnOpenModel");
   const btnSkip    = $("btnSkip");
@@ -89,7 +99,17 @@ async function startUninstall() {
     btnSkip.classList.remove("ghost");
     btnSkip.classList.add("primary");
   }
-  try { await window.nativeBeginUninstall(); }
+  const rebootTitle = document.querySelector("#page-done-reboot h1");
+  const rebootSub = document.querySelector("#page-done-reboot .sub");
+  const rebootNotice = $("rebootNotice");
+  if (rebootTitle) rebootTitle.textContent = "卸载即将完成，需要重启。";
+  if (rebootSub) {
+    rebootSub.textContent = keepUserData
+      ? "系统注册与应用缓存已清理；个人数据已保留。重启后会删除最后的占用文件。"
+      : "系统注册与个人数据已清理。重启后会删除最后的占用文件。";
+  }
+  if (rebootNotice) rebootNotice.textContent = "重启后无需再手工删除任何 Chatou 文件。";
+  try { await window.nativeBeginUninstall(removeUserData); }
   catch (e) {
     $("progressMsg").textContent = "失败：" + (e && e.message || e);
     appendLog(String(e), "error");

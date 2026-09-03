@@ -30,6 +30,7 @@
 #pragma comment(lib, "oleaut32.lib")
 #pragma comment(lib, "uuid.lib")
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <filesystem>
@@ -137,6 +138,16 @@ static std::vector<std::string> ParseJsonStringArray(const std::string& json) {
     if (i < json.size() && json[i] == ',') ++i;
   }
   return out;
+}
+
+static bool ParseJsonBoolArg(const std::string& json, bool fallback) {
+  size_t i = json.find('[');
+  if (i == std::string::npos) return fallback;
+  i = json.find_first_not_of(" \t\r\n", i + 1);
+  if (i == std::string::npos) return fallback;
+  if (json.compare(i, 4, "true") == 0) return true;
+  if (json.compare(i, 5, "false") == 0) return false;
+  return fallback;
 }
 
 // ─── install log ────────────────────────────────────────────────
@@ -443,6 +454,14 @@ static fs::path RimeUserDir() {
   return fs::path(root) / L"Rime";
 }
 
+static fs::path ChatouLocalDataDir() {
+  PWSTR p = nullptr; std::wstring root;
+  if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, NULL, &p))) {
+    root = p; CoTaskMemFree(p);
+  }
+  return fs::path(root) / L"Chatou";
+}
+
 // Base64 encode raw bytes. Used to inline chatou.png into the HTML so we
 // don't need to extract files for the installer's own webview UI.
 static std::string Base64(const unsigned char* data, size_t len) {
@@ -619,11 +638,16 @@ static bool StartDeElevatedArgs(const fs::path& exe_path,
   CloseHandle(hPriToken);
   if (!ok) return false;
 
+  DWORD child_exit = STILL_ACTIVE;
   if (wait_for_exit) {
-    WaitForSingleObject(pi.hProcess, 8000);
+    DWORD wait = WaitForSingleObject(pi.hProcess, 8000);
+    if (wait != WAIT_OBJECT_0 ||
+        !GetExitCodeProcess(pi.hProcess, &child_exit)) {
+      child_exit = STILL_ACTIVE;
+    }
   }
   CloseHandle(pi.hProcess); CloseHandle(pi.hThread);
-  return true;
+  return !wait_for_exit || child_exit == 0;
 }
 
 static bool StartDeElevated(const fs::path& exe_path) {
@@ -1574,7 +1598,7 @@ static void DoInstall(InstallOptions opts) {
                    " copy_ec=" + std::to_string(ec.value()));
 
     // 31. Add/Remove Programs entry.
-    WriteUninstallRegistry(wdir, L"0.8.2");
+    WriteUninstallRegistry(wdir, L"0.8.3");
     // This is an in-place upgrade from TypeAnything. Remove the legacy
     // Add/Remove Programs entry so Windows does not show two products.
     RegDeleteKeyExW(
@@ -1661,31 +1685,125 @@ static void DoInstall(InstallOptions opts) {
 }
 
 // ─── uninstall procedure ────────────────────────────────────────
-//
-// Reverses what DoInstall did:
-//   * Kill running Weasel-family processes.
-//   * Remove HKLM\Run autostart, HKLM CTF TIP profile description patches,
-//     WeaselRoot, Uninstall reg key.
-//   * Replace system32\weasel.dll with its .bak (if any), otherwise queue
-//     deletion on reboot.
-//   * Delete the install directory.
-//   * %APPDATA%\Rime is preserved (user dict + custom yamls stay so a
-//     later reinstall doesn't lose typing history). Caller may delete it.
 
-static void DeleteRegKey64(HKEY root, const wchar_t* sub) {
-  RegDeleteKeyExW(root, sub, KEY_WOW64_64KEY, 0);
-}
-static void DeleteRegValue64(HKEY root, const wchar_t* sub,
-                             const wchar_t* val) {
-  HKEY h;
-  if (RegOpenKeyExW(root, sub, 0, KEY_SET_VALUE | KEY_WOW64_64KEY, &h)
-      == ERROR_SUCCESS) {
-    RegDeleteValueW(h, val);
-    RegCloseKey(h);
+static void DeleteRegTreeViews(HKEY root, const wchar_t* sub) {
+  for (REGSAM view : {KEY_WOW64_64KEY, KEY_WOW64_32KEY}) {
+    HKEY h = nullptr;
+    if (RegOpenKeyExW(root, sub, 0, KEY_READ | KEY_WRITE | view, &h)
+        == ERROR_SUCCESS) {
+      RegDeleteTreeW(h, nullptr);
+      RegCloseKey(h);
+    }
+    RegDeleteKeyExW(root, sub, view, 0);
   }
 }
 
-static void DoUninstall() {
+static void DeleteRegValueViews(HKEY root, const wchar_t* sub,
+                                const wchar_t* val) {
+  for (REGSAM view : {KEY_WOW64_64KEY, KEY_WOW64_32KEY}) {
+    HKEY h = nullptr;
+    if (RegOpenKeyExW(root, sub, 0, KEY_SET_VALUE | view, &h)
+        == ERROR_SUCCESS) {
+      RegDeleteValueW(h, val);
+      RegCloseKey(h);
+    }
+  }
+}
+
+static bool QueueDeleteAfterRestart(const fs::path& path,
+                                    bool* reboot_needed) {
+  if (!fs::exists(path)) return true;
+  if (MoveFileExW(path.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT)) {
+    if (reboot_needed) *reboot_needed = true;
+    return true;
+  }
+  return false;
+}
+
+// Remove everything that is currently deletable and queue occupied files and
+// directories in child-before-parent order. This is important for TSF DLLs:
+// Word, browsers, and ctfmon may keep them mapped until Windows restarts.
+static void RemoveTreeForUninstall(const fs::path& root,
+                                   bool* reboot_needed) {
+  if (root.empty() || !fs::exists(root)) return;
+  std::vector<fs::path> files;
+  std::vector<fs::path> dirs;
+  std::error_code ec;
+  fs::recursive_directory_iterator it(
+      root, fs::directory_options::skip_permission_denied, ec), end;
+  for (; it != end; it.increment(ec)) {
+    if (ec) { ec.clear(); continue; }
+    std::error_code type_ec;
+    if (it->is_directory(type_ec)) dirs.push_back(it->path());
+    else files.push_back(it->path());
+  }
+  std::sort(dirs.begin(), dirs.end(), [](const fs::path& a,
+                                         const fs::path& b) {
+    return a.native().size() > b.native().size();
+  });
+
+  for (const auto& path : files) {
+    std::error_code remove_ec;
+    fs::remove(path, remove_ec);
+    if (fs::exists(path)) QueueDeleteAfterRestart(path, reboot_needed);
+  }
+  for (const auto& path : dirs) {
+    std::error_code remove_ec;
+    fs::remove(path, remove_ec);
+    if (fs::exists(path)) QueueDeleteAfterRestart(path, reboot_needed);
+  }
+  std::error_code remove_ec;
+  fs::remove(root, remove_ec);
+  if (fs::exists(root)) QueueDeleteAfterRestart(root, reboot_needed);
+}
+
+static bool UnregisterImeForCurrentProcessUser() {
+  wchar_t system_dir[MAX_PATH] = {0};
+  if (!GetSystemDirectoryW(system_dir, _countof(system_dir))) return false;
+  fs::path input_dll = fs::path(system_dir) / L"input.dll";
+  HMODULE h = LoadLibraryW(input_dll.c_str());
+  if (!h) return false;
+  using Fn = BOOL (WINAPI *)(LPCWSTR, DWORD);
+  auto fn = reinterpret_cast<Fn>(GetProcAddress(h, "InstallLayoutOrTip"));
+  BOOL ok = FALSE;
+  if (fn) {
+    ok = fn(L"0804:{A3F4CDED-B1E9-41EE-9CA6-7B4D0DE6CB0A}"
+            L"{3D02CAB6-2B8E-4781-BA20-1C9267529467}",
+            0x00000001);  // ILOT_UNINSTALL
+  }
+  FreeLibrary(h);
+  return ok != FALSE;
+}
+
+static void PushUninstallDone(bool reboot_needed, bool removed_user_data) {
+  std::string msg = reboot_needed
+      ? "系统注册与用户数据已清理；重启后删除最后的占用文件。"
+      : "Chatou 已从系统中彻底移除。";
+  std::string detail = removed_user_data
+      ? "应用、缓存、用户字典与模型配置均已清除"
+      : "应用与缓存已清除；用户字典和模型配置已保留";
+  if (!reboot_needed) {
+    PushStatus(100, msg, detail, "done", true);
+    return;
+  }
+  std::ostringstream j;
+  j << "{\"percent\":100";
+  j << ",\"msg\":\"" << JsonEscape(msg) << "\"";
+  j << ",\"log\":\"" << JsonEscape(detail) << "\"";
+  j << ",\"logStatus\":\"done\"";
+  j << ",\"done\":true,\"needs_reboot\":true}";
+  std::lock_guard<std::mutex> lock(g_progress.mu);
+  g_progress.queue.push_back(j.str());
+}
+
+static void DoUninstall(bool remove_user_data) {
+  fs::path wdir = WeaselDir();
+  SetInstallLogPath(wdir);
+  InstallLog("00. uninstall start",
+             std::string("remove_user_data=") +
+                 (remove_user_data ? "yes" : "no"));
+  bool reboot_needed = false;
+
   PushStatus(2, "停止运行中的输入法服务 …", "停止后台进程");
   for (const wchar_t* img : {L"WeaselServer.exe", L"WeaselDeployer.exe",
                               L"WeaselTrayIcon.exe", L"ta-settings.exe"}) {
@@ -1693,101 +1811,92 @@ static void DoUninstall() {
   }
   Sleep(800);
 
-  fs::path wdir = WeaselDir();
+  // Remove the per-user Win+Space entry while ta-settings.exe still exists.
+  PushStatus(8, "从输入法列表移除 …", "当前用户的 Chatou 输入法");
+  bool user_tip_removed = false;
+  fs::path ta_settings = wdir / L"ta-settings.exe";
+  if (fs::exists(ta_settings)) {
+    user_tip_removed = StartDeElevatedArgs(
+        ta_settings, L"--unregister-ime", true);
+  }
+  if (!user_tip_removed) {
+    user_tip_removed = UnregisterImeForCurrentProcessUser();
+  }
+  InstallLog("01. remove current-user IME",
+             user_tip_removed ? "ok" : "warning");
 
-  // Unregister TSF (DllUnregisterServer) while weaselx64.dll is still on
-  // disk. Removes the HKLM CTF\TIP CLSID subtree the installer created.
-  PushStatus(8, "从输入法框架注销 …", "TSF 注销 (DllUnregisterServer)");
+  // Ask the DLL to unregister itself, then forcibly sweep both registry
+  // views so an incomplete DllUnregisterServer cannot leave a ghost TIP.
+  PushStatus(15, "从输入法框架注销 …", "TSF 注销与注册表清理");
   ColdUnregisterTsfDll(wdir / L"weaselx64.dll");
+  DeleteRegTreeViews(
+      HKEY_LOCAL_MACHINE,
+      L"Software\\Microsoft\\CTF\\TIP\\{A3F4CDED-B1E9-41EE-9CA6-7B4D0DE6CB0A}");
+  DeleteRegTreeViews(
+      HKEY_LOCAL_MACHINE,
+      L"Software\\Classes\\CLSID\\{A3F4CDED-B1E9-41EE-9CA6-7B4D0DE6CB0A}");
 
-  // Remove Start Menu shortcut.
-  {
-    fs::path lnk = StartMenuProgramsAllUsers() / L"Chatou.lnk";
-    std::error_code ec; fs::remove(lnk, ec);
-    fs::remove(StartMenuProgramsAllUsers() / L"TypeAnything.lnk", ec);
-  }
+  DeleteRegValueViews(
+      HKEY_LOCAL_MACHINE,
+      L"Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+      L"WeaselServer");
+  DeleteRegTreeViews(
+      HKEY_LOCAL_MACHINE,
+      L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Chatou");
+  DeleteRegTreeViews(
+      HKEY_LOCAL_MACHINE,
+      L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\TypeAnything");
 
-  PushStatus(15, "撤销注册表项 …", "Run / Uninstall / WeaselRoot");
-  DeleteRegValue64(HKEY_LOCAL_MACHINE,
-                   L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
-                   L"WeaselServer");
-  DeleteRegKey64(HKEY_LOCAL_MACHINE,
-                 L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Chatou");
-  DeleteRegKey64(HKEY_LOCAL_MACHINE,
-                 L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\TypeAnything");
-  // WeaselRoot — keep until LAST so that anything reading it during
-  // uninstall still resolves correctly.
+  std::error_code shortcut_ec;
+  fs::remove(StartMenuProgramsAllUsers() / L"Chatou.lnk", shortcut_ec);
+  fs::remove(StartMenuProgramsAllUsers() / L"TypeAnything.lnk", shortcut_ec);
 
-  // Best-effort restore of system32\weasel.dll from its .bak (saved by
-  // an earlier install). If the file is in use it can be renamed but
-  // not overwritten, same trick the installer uses.
+  // Restore a pre-existing system DLL when the installer made a backup;
+  // otherwise remove Chatou's system copy. Locked files are replaced/deleted
+  // during the next Windows boot and are reported honestly in the UI.
   PushStatus(40, "还原系统组件 …", "system32\\weasel.dll");
-  {
-    fs::path sys32 = L"C:\\WINDOWS\\system32\\weasel.dll";
-    fs::path bak = sys32.wstring() + L".bak";
-    std::error_code ec;
-    if (fs::exists(bak)) {
-      // Rename current (locked) out, copy bak in.
-      auto stamp = std::to_string((long long)time(NULL));
-      fs::path moved = sys32.wstring() + L".uninstalled-" +
-                       std::wstring(stamp.begin(), stamp.end());
-      fs::rename(sys32, moved, ec);
-      fs::copy_file(bak, sys32, fs::copy_options::overwrite_existing, ec);
+  wchar_t system_dir[MAX_PATH] = {0};
+  GetSystemDirectoryW(system_dir, _countof(system_dir));
+  fs::path sys32 = fs::path(system_dir) / L"weasel.dll";
+  fs::path backup = sys32.wstring() + L".bak";
+  if (fs::exists(backup)) {
+    if (CopyFileW(backup.c_str(), sys32.c_str(), FALSE)) {
+      std::error_code backup_ec;
+      fs::remove(backup, backup_ec);
     } else {
-      // No backup — queue delete on reboot. Don't try to delete now
-      // (TSF probably has it mapped).
-      MoveFileExW(sys32.c_str(), NULL, MOVEFILE_DELAY_UNTIL_REBOOT);
+      bool delete_queued = QueueDeleteAfterRestart(sys32, &reboot_needed);
+      bool restore_queued = MoveFileExW(
+          backup.c_str(), sys32.c_str(),
+          MOVEFILE_REPLACE_EXISTING | MOVEFILE_DELAY_UNTIL_REBOOT) != FALSE;
+      if (restore_queued) reboot_needed = true;
+      InstallLog("02. restore system DLL",
+                 delete_queued && restore_queued ? "queued after restart"
+                                                 : "warning: queue failed");
+    }
+  } else if (fs::exists(sys32)) {
+    std::error_code system_ec;
+    fs::remove(sys32, system_ec);
+    if (fs::exists(sys32)) {
+      QueueDeleteAfterRestart(sys32, &reboot_needed);
     }
   }
 
-  // Delete the install directory. Don't fail the whole uninstall on
-  // individual stuck files — log them and continue.
-  PushStatus(70, "删除安装目录 …", "files in install dir");
-  if (fs::exists(wdir)) {
-    std::error_code ec;
-    for (auto& e : fs::recursive_directory_iterator(
-             wdir, fs::directory_options::skip_permission_denied, ec)) {
-      if (e.is_regular_file(ec)) {
-        std::error_code ec2;
-        if (!fs::remove(e.path(), ec2)) {
-          MoveFileExW(e.path().c_str(), NULL, MOVEFILE_DELAY_UNTIL_REBOOT);
-        }
-      }
-    }
-    fs::remove_all(wdir, ec);  // sweep remaining (incl. ourselves)
+  PushStatus(62, "清理应用文件 …", "程序、缓存与快捷方式");
+  RemoveTreeForUninstall(ChatouLocalDataDir(), &reboot_needed);
+  if (remove_user_data) {
+    PushStatus(76, "清理个人数据 …", "用户字典、API 配置与输入方案");
+    RemoveTreeForUninstall(RimeUserDir(), &reboot_needed);
   }
 
-  PushStatus(95, "清理注册表 …", "WeaselRoot");
-  DeleteRegKey64(HKEY_LOCAL_MACHINE, L"Software\\Rime\\Weasel");
+  PushStatus(88, "删除安装目录 …", "程序文件与卸载器");
+  RemoveTreeForUninstall(wdir, &reboot_needed);
 
-  // Self-cleanup. We're running from <wdir>\uninstall.exe — fs::remove
-  // can't delete a running .exe and MoveFileEx DELAY_UNTIL_REBOOT only
-  // wipes it after a reboot. Spawn a detached cmd.exe that waits a few
-  // seconds (for the user to close the done dialog and us to exit) then
-  // recursively removes the install dir. cmd.exe is in system32 not
-  // <wdir>, so it isn't affected by the dir going away.
-  {
-    std::wstring cmd_line =
-        L"cmd.exe /c ping -n 4 127.0.0.1 > nul & rmdir /s /q \""
-        + wdir.wstring() + L"\"";
-    STARTUPINFOW si{};
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
-    PROCESS_INFORMATION pi{};
-    if (CreateProcessW(nullptr, cmd_line.data(),
-                       nullptr, nullptr, FALSE,
-                       CREATE_NO_WINDOW | DETACHED_PROCESS,
-                       nullptr, nullptr, &si, &pi)) {
-      CloseHandle(pi.hProcess);
-      CloseHandle(pi.hThread);
-    }
-  }
-
-  // We intentionally do NOT delete %APPDATA%\Rime — that contains the
-  // user's learned dictionary + custom config. A later reinstall picks
-  // up where they left off.
-  PushStatus(100, "卸载完成。", "%APPDATA%\\Rime 保留（用户配置）", "done", true);
+  // WeaselRoot is deliberately removed last: all earlier helpers use it to
+  // resolve the selected installation directory.
+  DeleteRegTreeViews(HKEY_LOCAL_MACHINE, L"Software\\Rime\\Weasel");
+  InstallLog("03. uninstall complete",
+             reboot_needed ? "reboot required" : "no reboot required");
+  PushUninstallDone(reboot_needed, remove_user_data);
 }
 
 // ─── main ──────────────────────────────────────────────────────
@@ -1891,21 +2000,6 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR lpCmdLine, int) {
 
   // Mode: install (default) or uninstall (when invoked with /uninstall).
   const bool uninstall_mode = lpCmdLine && wcsstr(lpCmdLine, L"/uninstall");
-  if (uninstall_mode) {
-    // Up-front confirmation. If the user backs out here we don't even
-    // bother spinning up WebView2.
-    int yn = MessageBoxW(
-        NULL,
-        L"确定要卸载 Chatou 插头输入法吗？\n\n"
-        L"会清除安装目录与系统注册项。\n"
-        L"用户字典与个人配置（%APPDATA%\\Rime）会保留。",
-        L"卸载 Chatou",
-        MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2);
-    if (yn != IDYES) {
-      ::CoUninitialize();
-      return 0;
-    }
-  }
 
   // Force a writable WebView2 user data folder (Program Files is read-only).
   wchar_t lad[MAX_PATH] = {0};
@@ -1979,10 +2073,14 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR lpCmdLine, int) {
     return "true";
   });
 
-  // Bridge: begin uninstall.
-  w.bind("nativeBeginUninstall", [&](const std::string& /*args*/) -> std::string {
+  // Bridge: begin uninstall. The UI passes whether user data should be
+  // removed; complete removal is the default, preserving it is opt-in.
+  w.bind("nativeBeginUninstall", [&](const std::string& args) -> std::string {
     if (installing.exchange(true)) return "false";
-    std::thread([]() { DoUninstall(); }).detach();
+    bool remove_user_data = ParseJsonBoolArg(args, true);
+    std::thread([remove_user_data]() {
+      DoUninstall(remove_user_data);
+    }).detach();
     return "true";
   });
 

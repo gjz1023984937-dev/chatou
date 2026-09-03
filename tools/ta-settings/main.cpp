@@ -734,20 +734,22 @@ static LRESULT CALLBACK TaSubclassProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp
   return CallWindowProcW(g_original_wndproc, hwnd, msg, wp, lp);
 }
 
-// One-shot helper: install the TypeAnything TIP into the *current user's*
+// One-shot helper: add or remove the Chatou TIP in the *current user's*
 // input language list via input.dll!InstallLayoutOrTip. ta-installer runs
 // elevated and writes the machine-wide HKLM CTF\TIP registration, but the
 // per-user "show in Win+Space" mapping lives in HKCU and must be set as
-// the interactive user. The installer therefore calls back into us with
-// `--register-ime` via CreateProcessWithTokenW(shell-user-token), and we
-// just touch the API + exit.
+// the interactive user. The installer therefore calls back into us via
+// CreateProcessWithTokenW(shell-user-token), and we just touch the API + exit.
 //
 // Layout string format: "<langid>:{TIP-CLSID}{LANG-PROFILE-GUID}".
 //   0804 = zh-CN.
 //   {A3F4CDED-...} = TypeAnything TIP CLSID (matches installer & WeaselTSF).
 //   {3D02CAB6-...} = TypeAnything LanguageProfile GUID.
-static int RegisterImeForCurrentUser() {
-  HMODULE h = LoadLibraryW(L"input.dll");
+static int SetImeForCurrentUser(bool uninstall) {
+  wchar_t system_dir[MAX_PATH] = {0};
+  if (!GetSystemDirectoryW(system_dir, _countof(system_dir))) return 1;
+  fs::path input_dll = fs::path(system_dir) / L"input.dll";
+  HMODULE h = LoadLibraryW(input_dll.c_str());
   if (!h) return 1;
   typedef BOOL (WINAPI *InstallLayoutOrTipFn)(LPCWSTR, DWORD);
   auto fn = (InstallLayoutOrTipFn)GetProcAddress(h, "InstallLayoutOrTip");
@@ -755,7 +757,7 @@ static int RegisterImeForCurrentUser() {
   BOOL ok = fn(
       L"0804:{A3F4CDED-B1E9-41EE-9CA6-7B4D0DE6CB0A}"
       L"{3D02CAB6-2B8E-4781-BA20-1C9267529467}",
-      0);
+      uninstall ? 0x00000001 : 0);  // ILOT_UNINSTALL (not in a public header)
   FreeLibrary(h);
   return ok ? 0 : 1;
 }
@@ -767,13 +769,16 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     bool register_ime = false;
+    bool unregister_ime = false;
     if (argv) {
       for (int i = 1; i < argc; ++i) {
-        if (wcscmp(argv[i], L"--register-ime") == 0) { register_ime = true; break; }
+        if (wcscmp(argv[i], L"--register-ime") == 0) register_ime = true;
+        if (wcscmp(argv[i], L"--unregister-ime") == 0) unregister_ime = true;
       }
       LocalFree(argv);
     }
-    if (register_ime) return RegisterImeForCurrentUser();
+    if (register_ime) return SetImeForCurrentUser(false);
+    if (unregister_ime) return SetImeForCurrentUser(true);
   }
 
   std::string page = GetPageArg();

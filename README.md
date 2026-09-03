@@ -64,6 +64,12 @@ Chatou 接入 Windows 的文本服务框架，不依赖浏览器扩展。
 
 如果 Windows SmartScreen 提示未知发布者，可先核对 Release 页面提供的文件摘要，再选择是否运行。目前安装包尚未进行商业代码签名。
 
+## 卸载也要清楚
+
+在 Windows「已安装的应用」中选择 Chatou 即可卸载。默认会清除程序、输入法注册、缓存、用户字典和模型配置；如果准备以后重新安装，可以勾选「保留个人数据」。
+
+Word、浏览器或系统输入服务可能正在使用输入法 DLL。遇到这种情况，卸载器会自动安排重启删除，并明确提示重启；重启后不需要再手工寻找残留文件。
+
 <div align="center">
   <img src="docs/assets/chatou-installer.png" width="680" alt="Chatou 安装界面">
 </div>

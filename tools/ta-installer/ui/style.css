@@ -81,6 +81,11 @@ kbd { min-width: 27px; height: 21px; display: inline-flex; align-items: center; 
 .centered .sub { max-width: 480px; margin-top: 9px; }
 .notice { margin-top: 18px; padding: 10px 14px; color: var(--muted); background: rgba(255,255,255,.75); border: 1px solid var(--line); border-radius: 10px; font-size: 9.5px; }
 .notice code { font-family: var(--mono); }
+.uninstall-option { width: min(100%,420px); display: flex; align-items: center; gap: 11px; margin-top: 17px; padding: 11px 13px; color: var(--ink); background: rgba(255,255,255,.82); border: 1px solid var(--line); border-radius: 11px; text-align: left; cursor: pointer; }
+.uninstall-option input { width: 16px; height: 16px; flex: 0 0 auto; accent-color: var(--primary); }
+.uninstall-option span { display: flex; flex-direction: column; gap: 2px; }
+.uninstall-option strong { font-size: 10.5px; }
+.uninstall-option small { color: var(--muted); font-size: 8.5px; }
 .centered-actions { flex: initial; margin-top: 20px; padding: 0; }
 
 .progressbar { width: min(100%,480px); height: 7px; margin-top: 22px; overflow: hidden; background: #e2e8f2; border-radius: 99px; }
