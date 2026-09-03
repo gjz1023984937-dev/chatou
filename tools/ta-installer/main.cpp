@@ -1598,7 +1598,7 @@ static void DoInstall(InstallOptions opts) {
                    " copy_ec=" + std::to_string(ec.value()));
 
     // 31. Add/Remove Programs entry.
-    WriteUninstallRegistry(wdir, L"0.8.4");
+    WriteUninstallRegistry(wdir, L"0.8.5");
     // This is an in-place upgrade from TypeAnything. Remove the legacy
     // Add/Remove Programs entry so Windows does not show two products.
     RegDeleteKeyExW(
@@ -1994,12 +1994,45 @@ static std::string FileUrl(const fs::path& p) {
   return "file:///" + WideToUtf8(w);
 }
 
+static bool IsUninstallInvocation(LPWSTR lpCmdLine) {
+  // uninstall.exe is a copy of the installer. Windows Settings launches it
+  // with /uninstall, but users naturally also double-click the file in the
+  // install directory. The executable name must therefore be authoritative.
+  wchar_t self[MAX_PATH] = {0};
+  if (GetModuleFileNameW(nullptr, self, _countof(self))) {
+    std::wstring filename = fs::path(self).filename().wstring();
+    if (_wcsicmp(filename.c_str(), L"uninstall.exe") == 0) return true;
+  }
+
+  // Keep accepting explicit switches for Windows' Add/Remove Programs entry
+  // and for older installations that already reference /uninstall.
+  int argc = 0;
+  LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+  bool requested = false;
+  if (argv) {
+    for (int i = 1; i < argc; ++i) {
+      if (_wcsicmp(argv[i], L"/uninstall") == 0 ||
+          _wcsicmp(argv[i], L"--uninstall") == 0 ||
+          _wcsicmp(argv[i], L"-uninstall") == 0) {
+        requested = true;
+        break;
+      }
+    }
+    LocalFree(argv);
+  }
+
+  // Retain compatibility with unusual callers that pass a combined command
+  // line. Exact argv matching above handles the normal path.
+  return requested || (lpCmdLine && wcsstr(lpCmdLine, L"/uninstall"));
+}
+
 int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR lpCmdLine, int) {
   // CoInitialize for IFileOpenDialog (install-dir picker).
   ::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 
-  // Mode: install (default) or uninstall (when invoked with /uninstall).
-  const bool uninstall_mode = lpCmdLine && wcsstr(lpCmdLine, L"/uninstall");
+  // Mode: install (default) or uninstall. A file named uninstall.exe always
+  // opens the uninstall UI, even when it is launched by direct double-click.
+  const bool uninstall_mode = IsUninstallInvocation(lpCmdLine);
 
   // Force a writable WebView2 user data folder (Program Files is read-only).
   wchar_t lad[MAX_PATH] = {0};
