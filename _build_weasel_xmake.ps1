@@ -61,9 +61,9 @@ Copy-Item (Join-Path $taskWtlInclude "*") (Join-Path $taskWeaselRoot "include\wt
 $env:BOOST_ROOT = $taskBoostRoot
 $env:VERSION_MAJOR = "0"
 $env:VERSION_MINOR = "8"
-$env:VERSION_PATCH = "1"
-$env:FILE_VERSION = '"0.8.1.0"'
-$env:PRODUCT_VERSION = '"0.8.1.0"'
+$env:VERSION_PATCH = "2"
+$env:FILE_VERSION = '"0.8.2.0"'
+$env:PRODUCT_VERSION = '"0.8.2.0"'
 
 Set-Location $taskWeaselRoot
 xmake f -p windows -a x64 -m release -y

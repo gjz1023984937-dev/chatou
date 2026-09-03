@@ -33,13 +33,13 @@ WeaselServerApp::~WeaselServerApp() {}
 // registry read fails (e.g. running from a dev build that never went
 // through the installer).
 #ifndef TA_VERSION
-#define TA_VERSION L"v0.6.4"
+#define TA_VERSION L"v0.8.2"
 #endif
 
 namespace {
 
 // Read the installed version from the Add/Remove Programs registry entry
-// (set by ta-installer step 12). Returns the literal e.g. "v0.6.4", with
+// (set by ta-installer step 12). Returns the literal e.g. "v0.8.2", with
 // the "v" prefix prepended. Falls back to the compile-time TA_VERSION.
 static std::wstring GetInstalledVersion() {
   HKEY h;

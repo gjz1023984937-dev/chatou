@@ -374,7 +374,7 @@ typeanything:
 
 ## 版本历史
 
-### v0.8.1（当前）
+### v0.8.2（当前）
 - **Chatou 品牌升级**：界面、安装器、Windows 输入法名称、更新源和应用图标统一为 Chatou / 插头
 - **兼容原有数据**：保留 `typeanything.*` 配置文件、schema id 与 TSF GUID，原设置可以原地升级
 - **全局 F8 翻译**：在 Word、记事本及主流浏览器输入框中使用 F8；Enter 恢复为宿主应用正常发送/换行
