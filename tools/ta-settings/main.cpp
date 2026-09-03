@@ -681,7 +681,7 @@ static webview::webview* g_webview = nullptr;
 // .window-controls width = N * .wc width). Top strip is the drag region;
 // right cluster reserves WM_NCHITTEST → HTCLIENT so the custom min/close
 // buttons receive their own clicks.
-static const int kTitlebarHpx     = 42;
+static const int kTitlebarHpx     = 48;
 static const int kBtnClusterWpx   = 100;
 
 static LRESULT CALLBACK TaSubclassProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -826,22 +826,22 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
   // Same dimensions for both pages — user switches between them via the
   // top tab nav, so the window size shouldn't jump.
   //
-  // Default size 700x786 is too tall for 1366x768 / 1536x864 @ 125% DPI
-  // (issue #10). Clamp to work-area minus a small safety margin so the
-  // panel always fits and "保存" button stays reachable. SM_CXFULLSCREEN /
+  // The redesigned shell uses a compact sidebar and a wider content pane.
+  // Clamp to the work area so the panel still fits smaller laptop screens
+  // and the sticky action row always stays reachable. SM_CXFULLSCREEN /
   // SM_CYFULLSCREEN report the maximized client area (work area minus
   // taskbar), which is what we want here.
   {
     int sw = GetSystemMetrics(SM_CXFULLSCREEN);
     int sh = GetSystemMetrics(SM_CYFULLSCREEN);
-    int want_w = 700, want_h = 786;
+    int want_w = 920, want_h = 700;
     if (sw > 0 && want_w > sw - 80) want_w = sw - 80;
     if (sh > 0 && want_h > sh - 80) want_h = sh - 80;
-    if (want_w < 480) want_w = 480;
-    if (want_h < 520) want_h = 520;
+    if (want_w < 680) want_w = 680;
+    if (want_h < 560) want_h = 560;
     w.set_size(want_w, want_h, WEBVIEW_HINT_NONE);
   }
-  w.set_size(480, 520, WEBVIEW_HINT_MIN);
+  w.set_size(680, 560, WEBVIEW_HINT_MIN);
 
   // ─── Native bridge ────────────────────────────────────────
   w.bind("nativeReadLang", [](const std::string& /*args*/) -> std::string {
@@ -1139,8 +1139,8 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
       int outer_h = cur.bottom - cur.top;
       if (outer_w > max_w) outer_w = max_w;
       if (outer_h > max_h) outer_h = max_h;
-      if (outer_w < 480) outer_w = 480;
-      if (outer_h < 520) outer_h = 520;
+      if (outer_w < 680) outer_w = 680;
+      if (outer_h < 560) outer_h = 560;
       int x = cur.left, y = cur.top;
       if (x < wa.left) x = wa.left;
       if (y < wa.top)  y = wa.top;

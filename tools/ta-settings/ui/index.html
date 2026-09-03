@@ -9,165 +9,237 @@
 </head>
 <body>
 
-<!-- ─── Frameless titlebar (we strip WS_CAPTION; HTML owns the top edge) ─ -->
 <header class="titlebar">
   <div class="title">
     <span class="logo" aria-hidden="true"></span>
-    <span class="brand">神仙鱼<em>TypeAnything</em></span>
+    <span class="brand">TypeAnything <em>Studio</em></span>
   </div>
-  <label class="pure-toggle" id="pureToggleWrap" title="开启后只输出原始中文，并停用 F8 翻译">
-    <span class="pure-toggle-label">纯净模式</span>
-    <input type="checkbox" id="pureToggle" />
-    <span class="pure-toggle-slider" aria-hidden="true"></span>
-  </label>
-  <div class="window-controls" aria-hidden="false">
-    <button class="wc wc-min"   id="wcMin"   type="button" aria-label="最小化">
-      <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
+  <div class="titlebar-status" id="runtimeStatus" aria-label="翻译快捷键">
+    <span class="status-dot"></span>
+    <span id="runtimeStatusText">翻译已就绪</span>
+    <kbd>F8</kbd>
+  </div>
+  <div class="window-controls" aria-label="窗口控制">
+    <button class="wc wc-min" id="wcMin" type="button" aria-label="最小化">
+      <svg width="11" height="1" viewBox="0 0 11 1"><rect width="11" height="1" fill="currentColor"/></svg>
     </button>
     <button class="wc wc-close" id="wcClose" type="button" aria-label="关闭">
-      <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 1 L9 9 M9 1 L1 9" stroke="currentColor" stroke-width="1" fill="none"/></svg>
+      <svg width="11" height="11" viewBox="0 0 11 11"><path d="M1 1 L10 10 M10 1 L1 10" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
     </button>
   </div>
 </header>
 
-<nav class="page-tabs">
-  <button class="page-tab" data-page="lang">切换风格</button>
-  <button class="page-tab" data-page="model">模型配置</button>
-</nav>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-heading">设置中心</div>
+    <nav class="page-tabs" aria-label="设置页面">
+      <button class="page-tab" data-page="lang" type="button">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 5h10M9 3v2c0 4.2-2.2 7.7-5.5 9.8M6.5 9.5c1.4 2.1 3.4 3.8 5.8 5M14 20l3.5-8 3.5 8M15.2 17h4.6"/></svg>
+        </span>
+        <span><strong>翻译风格</strong><small>语言、语气与表达方式</small></span>
+      </button>
+      <button class="page-tab" data-page="model" type="button">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M9 4h6l1 3 3 1v8l-3 1-1 3H9l-1-3-3-1V8l3-1 1-3Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </span>
+        <span><strong>模型服务</strong><small>服务商、密钥与接口</small></span>
+      </button>
+    </nav>
 
-<main>
+    <div class="sidebar-spacer"></div>
 
-  <!-- ───────────────────────── PAGE: LANGUAGE ───────────────────────── -->
-  <section class="page" id="page-lang">
-    <p class="eyebrow">SWITCH TARGET</p>
-    <h1>你说什么<span class="accent">口吻</span>，AI 就给你什么口吻。</h1>
-
-    <div class="input-wrap">
-      <input id="langInput" type="text" placeholder="English" autofocus />
-      <button id="langSave" class="btn primary">保存</button>
-    </div>
-    <p class="sub">输入任意自然语言描述，下次按 <code>F8</code> 翻译时即按此风格落地。可以是语种、圈层、文体，甚至「像鲁迅一样的英语」。</p>
-
-    <div class="category">
-      <h3>语种</h3>
-      <div class="chips" data-group="lang" data-category="A">
-        <button class="chip">English</button>
-        <button class="chip">日本語</button>
-        <button class="chip">한국어</button>
-        <button class="chip">Français</button>
-        <button class="chip">Deutsch</button>
-        <button class="chip">Español</button>
-        <button class="chip">粵語</button>
+    <section class="mode-card">
+      <div class="mode-copy">
+        <span class="mode-icon" aria-hidden="true">◇</span>
+        <span><strong>纯净模式</strong><small>暂停 AI 翻译，只保留输入</small></span>
       </div>
+      <label class="pure-toggle" id="pureToggleWrap" title="开启后只输出原始中文，并停用 F8 翻译">
+        <input type="checkbox" id="pureToggle" />
+        <span class="pure-toggle-slider" aria-hidden="true"></span>
+      </label>
+    </section>
+
+    <div class="sidebar-meta">
+      <span>本地运行 · BYOK</span>
+      <span class="privacy-dot"></span>
+      <span>无中转</span>
     </div>
+  </aside>
 
-    <div class="category">
-      <h3>圈层风格</h3>
-      <div class="chips" data-group="clique" data-category="B">
-        <button class="chip">金融式说话</button>
-        <button class="chip">留学生式说话</button>
-        <button class="chip">互联网黑话</button>
-        <button class="chip">学术大佬式</button>
-        <button class="chip">HR 式说话</button>
-        <button class="chip">销售式说话</button>
-        <button class="chip">二次元</button>
-        <button class="chip">东北话</button>
-        <button class="chip">台湾腔</button>
-        <button class="chip">老北京话</button>
-      </div>
-    </div>
-
-    <div class="category">
-      <h3>文体</h3>
-      <div class="chips" data-group="medium" data-category="B">
-        <button class="chip">古汉语风格</button>
-        <button class="chip">知乎大佬腔</button>
-        <button class="chip">鲁迅式中文</button>
-        <button class="chip">小红书种草体</button>
-        <button class="chip">营销号体</button>
-        <button class="chip">武侠小说体</button>
-        <button class="chip">玄幻爽文体</button>
-        <button class="chip">古风小生</button>
-        <button class="chip">玛丽苏文</button>
-      </div>
-    </div>
-
-    <div class="category">
-      <h3>人设话术</h3>
-      <div class="chips" data-group="persona" data-category="B">
-        <button class="chip">客服式</button>
-        <button class="chip">法律文书</button>
-        <button class="chip">公文体</button>
-        <button class="chip">渣男话术</button>
-        <button class="chip">舔狗式</button>
-        <button class="chip">AI 助手腔</button>
-      </div>
-    </div>
-
-    <div class="category">
-      <h3>跨语种 / 编码</h3>
-      <div class="chips" data-group="cross">
-        <button class="chip" data-category="C">学术英语</button>
-        <button class="chip" data-category="C">商务日语</button>
-        <button class="chip" data-category="C">港片黑帮台词</button>
-        <button class="chip" data-category="C">Klingon battle prose</button>
-        <button class="chip" data-category="C">Cockney slang</button>
-        <button class="chip" data-category="C">Indian English</button>
-        <button class="chip" data-category="D">火星文</button>
-        <button class="chip" data-category="D">拼音体</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- ───────────────────────── PAGE: MODEL ─────────────────────────── -->
-  <section class="page" id="page-model" hidden>
-    <p class="eyebrow">PROVIDER · BYOK</p>
-    <h1>接入你自己的<span class="accent">模型</span>。</h1>
-    <p class="sub">你的输入只发到下面这个 endpoint。无中转、无后端代理。默认 DeepSeek，可换 OpenAI / Moonshot / 智谱 / 自托管 vLLM / Ollama 等任意 OpenAI Chat Completions 兼容 API。</p>
-
-    <div class="preset-row">
-      <button class="preset" data-preset="deepseek">DeepSeek</button>
-      <button class="preset" data-preset="moonshot">Moonshot</button>
-      <button class="preset" data-preset="openai">OpenAI</button>
-      <button class="preset" data-preset="ollama">Ollama</button>
-      <button class="preset" data-preset="custom">自定义</button>
-    </div>
-
-    <form id="modelForm" class="form-grid" onsubmit="return false;">
-      <label class="full">
-        <span>API Key</span>
-        <div class="masked">
-          <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
-          <button type="button" class="toggle" id="toggleKey" title="显示 / 隐藏" aria-label="toggle">👁</button>
+  <main>
+    <section class="page" id="page-lang">
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">TRANSLATION PROFILE</p>
+          <h1>让每次表达，都更像你。</h1>
+          <p class="sub">选择语言、口吻或文体。输入完成后按 <kbd>F8</kbd>，AI 会按当前风格直接替换原文。</p>
         </div>
-      </label>
+        <span class="page-badge">即时生效</span>
+      </div>
 
-      <label class="full">
-        <span>Model</span>
-        <input id="model" type="text" placeholder="deepseek-chat" />
-      </label>
+      <section class="command-card">
+        <label for="langInput">当前翻译风格</label>
+        <div class="input-wrap">
+          <input id="langInput" type="text" placeholder="English" autofocus />
+          <button id="langSave" class="btn primary" type="button">
+            <span>保存风格</span>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 6 6-6 6"/></svg>
+          </button>
+        </div>
+        <p class="field-help">也可以输入自然语言描述，例如“简洁的商务英语”或“像朋友聊天一样”。</p>
+      </section>
 
-      <label class="full">
-        <span>Host</span>
-        <input id="host" type="text" placeholder="api.deepseek.com" />
-      </label>
-      <label class="full">
-        <span>Path</span>
-        <input id="path" type="text" placeholder="/v1/chat/completions" />
-      </label>
+      <div class="section-title">
+        <div><span>风格库</span><small>点击即可填入，保存后生效</small></div>
+      </div>
 
-      <p class="endpoint-preview" id="endpointPreview"></p>
-    </form>
+      <div class="style-grid">
+        <section class="style-card category">
+          <div class="style-card-head"><span class="category-icon blue">文</span><div><h3>常用语言</h3><p>适合日常翻译</p></div></div>
+          <div class="chips" data-group="lang" data-category="A">
+            <button class="chip">English</button>
+            <button class="chip">日本語</button>
+            <button class="chip">한국어</button>
+            <button class="chip">Français</button>
+            <button class="chip">Deutsch</button>
+            <button class="chip">Español</button>
+            <button class="chip">粵語</button>
+          </div>
+        </section>
 
-    <div class="actions">
-      <button class="btn" id="btnCancelModel">取消</button>
-      <button class="btn primary" id="btnSaveModel">保存并应用</button>
-    </div>
-  </section>
+        <section class="style-card category">
+          <div class="style-card-head"><span class="category-icon violet">圈</span><div><h3>圈层风格</h3><p>切换沟通语境</p></div></div>
+          <div class="chips" data-group="clique" data-category="B">
+            <button class="chip">金融式说话</button>
+            <button class="chip">留学生式说话</button>
+            <button class="chip">互联网黑话</button>
+            <button class="chip">学术大佬式</button>
+            <button class="chip">HR 式说话</button>
+            <button class="chip">销售式说话</button>
+            <button class="chip">二次元</button>
+            <button class="chip">东北话</button>
+            <button class="chip">台湾腔</button>
+            <button class="chip">老北京话</button>
+          </div>
+        </section>
 
-</main>
+        <section class="style-card category">
+          <div class="style-card-head"><span class="category-icon amber">体</span><div><h3>内容文体</h3><p>匹配不同创作场景</p></div></div>
+          <div class="chips" data-group="medium" data-category="B">
+            <button class="chip">古汉语风格</button>
+            <button class="chip">知乎大佬腔</button>
+            <button class="chip">鲁迅式中文</button>
+            <button class="chip">小红书种草体</button>
+            <button class="chip">营销号体</button>
+            <button class="chip">武侠小说体</button>
+            <button class="chip">玄幻爽文体</button>
+            <button class="chip">古风小生</button>
+            <button class="chip">玛丽苏文</button>
+          </div>
+        </section>
 
-<!-- toast -->
+        <section class="style-card category">
+          <div class="style-card-head"><span class="category-icon green">人</span><div><h3>角色话术</h3><p>快速进入指定身份</p></div></div>
+          <div class="chips" data-group="persona" data-category="B">
+            <button class="chip">客服式</button>
+            <button class="chip">法律文书</button>
+            <button class="chip">公文体</button>
+            <button class="chip">渣男话术</button>
+            <button class="chip">舔狗式</button>
+            <button class="chip">AI 助手腔</button>
+          </div>
+        </section>
+
+        <section class="style-card category wide-card">
+          <div class="style-card-head"><span class="category-icon rose">↗</span><div><h3>跨语种与编码</h3><p>更特别的表达方式</p></div></div>
+          <div class="chips" data-group="cross">
+            <button class="chip" data-category="C">学术英语</button>
+            <button class="chip" data-category="C">商务日语</button>
+            <button class="chip" data-category="C">港片黑帮台词</button>
+            <button class="chip" data-category="C">Klingon battle prose</button>
+            <button class="chip" data-category="C">Cockney slang</button>
+            <button class="chip" data-category="C">Indian English</button>
+            <button class="chip" data-category="D">火星文</button>
+            <button class="chip" data-category="D">拼音体</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="page" id="page-model" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">MODEL CONNECTION</p>
+          <h1>连接你的 AI 服务。</h1>
+          <p class="sub">请求从本机直达你选择的服务商。API Key 不经过 TypeAnything 的服务器。</p>
+        </div>
+        <span class="page-badge secure"><span class="status-dot"></span>本地直连</span>
+      </div>
+
+      <section class="settings-card provider-card">
+        <div class="card-heading">
+          <div><h2>选择服务商</h2><p>使用预设，或连接任意兼容 OpenAI Chat Completions 的接口。</p></div>
+        </div>
+        <div class="preset-row">
+          <button class="preset" data-preset="deepseek" type="button"><span class="provider-mark deepseek">D</span><span>DeepSeek</span></button>
+          <button class="preset" data-preset="moonshot" type="button"><span class="provider-mark moonshot">M</span><span>Moonshot</span></button>
+          <button class="preset" data-preset="openai" type="button"><span class="provider-mark openai">O</span><span>OpenAI</span></button>
+          <button class="preset" data-preset="ollama" type="button"><span class="provider-mark ollama">◎</span><span>Ollama</span></button>
+          <button class="preset" data-preset="custom" type="button"><span class="provider-mark custom">+</span><span>自定义</span></button>
+        </div>
+      </section>
+
+      <section class="settings-card connection-card">
+        <div class="card-heading">
+          <div><h2>连接信息</h2><p>保存后会重新载入输入法服务，现有个人词典不受影响。</p></div>
+          <span class="config-label">BYOK</span>
+        </div>
+
+        <form id="modelForm" class="form-grid" onsubmit="return false;">
+          <label class="full">
+            <span>API Key</span>
+            <div class="masked">
+              <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
+              <button type="button" class="toggle" id="toggleKey" title="显示或隐藏 API Key" aria-label="显示或隐藏 API Key">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-5 9.5-5 9.5 5 9.5 5-3.5 5-9.5 5-9.5-5-9.5-5Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+              </button>
+            </div>
+            <small class="input-note">密钥仅保存在你的电脑上。</small>
+          </label>
+
+          <label class="full">
+            <span>Model</span>
+            <input id="model" type="text" placeholder="deepseek-chat" />
+          </label>
+
+          <label class="half">
+            <span>Host</span>
+            <input id="host" type="text" placeholder="api.deepseek.com" />
+          </label>
+          <label class="half">
+            <span>Path</span>
+            <input id="path" type="text" placeholder="/v1/chat/completions" />
+          </label>
+
+          <p class="endpoint-preview" id="endpointPreview"></p>
+        </form>
+      </section>
+
+      <div class="actions">
+        <div class="action-note"><kbd>F8</kbd><span>保存后，在任意输入框中使用</span></div>
+        <div class="action-buttons">
+          <button class="btn secondary" id="btnCancelModel" type="button">取消</button>
+          <button class="btn primary" id="btnSaveModel" type="button">
+            <span>保存并应用</span>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
 <div id="toast" class="toast" hidden></div>
 
 <script src="app.js"></script>

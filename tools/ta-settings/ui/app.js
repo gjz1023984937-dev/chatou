@@ -147,6 +147,8 @@ async function initLangPage() {
   // previously typed value (or "English") and unlock the UI.
   const pureToggle = document.getElementById("pureToggle");
   const mainEl = document.querySelector("main");
+  const runtimeStatus = document.getElementById("runtimeStatus");
+  const runtimeStatusText = document.getElementById("runtimeStatusText");
   let lastLang = "";  // remembers value before pure mode flip-on
   function applyPureLock(on) {
     if (mainEl) {
@@ -158,6 +160,10 @@ async function initLangPage() {
       "#page-lang input, #page-lang button.chip, #page-lang .btn.primary, " +
       "#page-model input, #page-model button"
     ).forEach(el => { el.disabled = !!on; });
+    if (runtimeStatus) runtimeStatus.classList.toggle("paused", !!on);
+    if (runtimeStatusText) {
+      runtimeStatusText.textContent = on ? "翻译已暂停" : "翻译已就绪";
+    }
   }
   if (pureToggle) {
     // Initial state: reflect current lang file.
