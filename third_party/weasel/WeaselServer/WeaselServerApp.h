@@ -9,7 +9,6 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
-#include <winsparkle.h>
 
 #include "WeaselTrayIcon.h"
 
@@ -33,7 +32,7 @@ class WeaselServerApp {
                                     SW_SHOWNORMAL) > 32;
   }
 
-  // TypeAnything: in-app update check.
+  // Chatou: in-app update check.
   //   * Hits GitHub releases API for the latest tag.
   //   * If newer than the embedded version, prompts the user.
   //   * On accept, downloads the installer .exe to %TEMP% and runs it

@@ -1,4 +1,4 @@
-# Build ta-installer.exe (single-exe TypeAnything installer).
+# Build ta-installer.exe (single-exe Chatou installer).
 #
 # Steps:
 #   1. _stage_embed.ps1 copies fresh artifacts into embed/.

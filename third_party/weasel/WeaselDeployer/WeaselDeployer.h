@@ -8,7 +8,7 @@
 
 #define MSG_BY_IDS(idInfo, idCap, uType)           \
   {                                                \
-    CString info, cap;                             \
+    ATL::CString info, cap;                        \
     info.LoadStringW(idInfo);                      \
     cap.LoadStringW(idCap);                        \
     LANGID langID = GetThreadUILanguage();         \
@@ -17,7 +17,7 @@
 
 #define MSG_ID_CAP(info, idCap, uType)             \
   {                                                \
-    CString cap;                                   \
+    ATL::CString cap;                              \
     cap.LoadStringW(idCap);                        \
     LANGID langID = GetThreadUILanguage();         \
     MessageBoxExW(NULL, info, cap, uType, langID); \

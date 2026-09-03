@@ -1,4 +1,4 @@
-// TypeAnything installer — UI logic + native bridge.
+// Chatou installer — UI logic + native bridge.
 //
 // Mode (set by C++ before app.js loads): window.TA_MODE = "install" | "uninstall".
 //
@@ -79,7 +79,7 @@ async function startUninstall() {
   const doneSub = document.querySelector("#page-done .sub");
   const doneLegal = document.querySelector("#page-done .legal");
   if (doneTitle) doneTitle.innerHTML = "卸载完成。";
-  if (doneSub)   doneSub.textContent = "TypeAnything 已从系统移除。用户字典与个人配置已保留。";
+  if (doneSub)   doneSub.textContent = "Chatou 已从系统移除。用户字典与个人配置已保留。";
   if (doneLegal) doneLegal.remove();
   const btnPrimary = $("btnOpenModel");
   const btnSkip    = $("btnSkip");

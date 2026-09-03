@@ -196,7 +196,7 @@ BOOL WeaselTSF::_InitPreservedKey() {
   TF_PRESERVEDKEY preservedKey = {};
   preservedKey.uVKey = VK_F8;
   preservedKey.uModifiers = 0;
-  static const WCHAR description[] = L"TypeAnything AI translation";
+  static const WCHAR description[] = L"Chatou AI translation";
 
   // Clear a stale registration left by an earlier activation in the same
   // process, then install the current one.

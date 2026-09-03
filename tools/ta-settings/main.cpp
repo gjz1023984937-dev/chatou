@@ -1,4 +1,4 @@
-// TypeAnything Settings — modern WebView2 + HTML/CSS UI for the two tray menu
+// Chatou Settings — modern WebView2 + HTML/CSS UI for the two tray menu
 // items "Switch Language" and "Model Config". Replaces the old PowerShell
 // InputBox / WinForms popups.
 //
@@ -51,8 +51,8 @@ namespace fs = std::filesystem;
 // named file mapping to share the HWND across processes, and a custom
 // WM_APP+1 message PostMessage'd from the secondary instance.
 
-static const wchar_t* TA_MUTEX_NAME = L"Local\\TypeAnything-ta-settings-singleton-v1";
-static const wchar_t* TA_HWND_MAP_NAME = L"Local\\TypeAnything-ta-settings-hwnd-v1";
+static const wchar_t* TA_MUTEX_NAME = L"Local\\Chatou-ta-settings-singleton-v1";
+static const wchar_t* TA_HWND_MAP_NAME = L"Local\\Chatou-ta-settings-hwnd-v1";
 // wparam: 0 = lang, 1 = model
 static const UINT WM_TA_SHOWPAGE = WM_APP + 1;
 
@@ -246,7 +246,7 @@ static std::string HttpsPost(const std::string& host, const std::string& path,
   // can hang for many seconds on some networks. We talk to a public HTTPS
   // endpoint; if a corporate proxy is required the user's WinINET settings
   // still apply via the system default, but we avoid the WPAD stall.
-  HINTERNET hSession = WinHttpOpen(L"TypeAnything-Classifier/1.0",
+  HINTERNET hSession = WinHttpOpen(L"Chatou-Classifier/1.0",
                                    WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
                                    WINHTTP_NO_PROXY_NAME,
                                    WINHTTP_NO_PROXY_BYPASS, 0);
@@ -809,11 +809,11 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
 
   // WebView2 needs a writable user-data folder. Its default is alongside
   // the exe, which is C:\Program Files\Rime\weasel-0.17.4 (read-only).
-  // Force it under %LOCALAPPDATA%\TypeAnything\WebView2 instead.
+  // Force it under %LOCALAPPDATA%\Chatou\WebView2 instead.
   {
     wchar_t lad[MAX_PATH] = {0};
     if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, lad))) {
-      std::wstring ud = std::wstring(lad) + L"\\TypeAnything\\WebView2";
+      std::wstring ud = std::wstring(lad) + L"\\Chatou\\WebView2";
       std::error_code ec;
       fs::create_directories(ud, ec);
       SetEnvironmentVariableW(L"WEBVIEW2_USER_DATA_FOLDER", ud.c_str());
@@ -822,7 +822,7 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
 
   // Webview window (Edge WebView2).
   webview::webview w(true /* debug */, nullptr);
-  w.set_title("TypeAnything");
+  w.set_title("Chatou 插头");
   // Same dimensions for both pages — user switches between them via the
   // top tab nav, so the window size shouldn't jump.
   //

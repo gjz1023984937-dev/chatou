@@ -1,6 +1,7 @@
 MIT License
 
 Copyright (c) 2026 HRDAI / TypeAnything contributors
+Copyright (c) 2026 Chatou contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +29,7 @@ under third_party/weasel/. Those files retain their original licenses
 applies only to:
 
 - librime/plugins/typeanything/**       (our Rime plugin)
-- install-typeanything-to-weasel.ps1    (deployment script)
+- install-chatou-to-weasel.ps1          (deployment script)
 - _build_weasel_xmake.ps1                 (build script)
-- README.md, TypeAnything.md, LICENSE
+- README.md, LICENSE
 - diffs to upstream Weasel files (visible in git history)

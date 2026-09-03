@@ -1,4 +1,4 @@
-// TypeAnything one-click installer.
+// Chatou one-click installer.
 //
 // Single-exe distribution that bundles every shipping artifact as RT_RCDATA
 // (Weasel binaries + ta-settings.exe + WebView2Loader.dll + ui/ + schema
@@ -10,7 +10,7 @@
 //   3. Worker thread: stop existing Weasel processes, extract embedded
 //      artifacts to C:\Program Files\Rime\weasel-0.17.4\, write schema yaml
 //      with injected api_key, patch HKLM\SOFTWARE\Microsoft\CTF\TIP profile
-//      descriptions to "TypeAnything", run WeaselDeployer /deploy, start
+//      descriptions to "Chatou 插头", run WeaselDeployer /deploy, start
 //      WeaselServer.
 //   4. Done screen: tells user new IME is usable in any *new* app without
 //      reboot.
@@ -142,7 +142,7 @@ static std::vector<std::string> ParseJsonStringArray(const std::string& json) {
 // ─── install log ────────────────────────────────────────────────
 //
 // Comprehensive observability for cold-install failures. Lives at
-// <install_dir>\typeanything_install.log (NOT %APPDATA% — cold-install
+// <install_dir>\chatou_install.log (NOT %APPDATA% — cold-install
 // boxes may have no Roaming\Rime yet, but install_dir is always
 // user-chosen and known to exist by log time).
 //
@@ -185,7 +185,7 @@ static void SetInstallLogPath(const fs::path& install_dir) {
   std::lock_guard<std::mutex> lock(g_log_mu);
   std::error_code ec;
   fs::create_directories(install_dir, ec);
-  g_install_log_path = install_dir / L"typeanything_install.log";
+  g_install_log_path = install_dir / L"chatou_install.log";
 }
 
 // Append one step record to the install log. Safe to call from any
@@ -263,7 +263,7 @@ static void ShowFailureDialog(const std::string& summary) {
       L"安装失败：\n\n" + Utf8ToWide(summary) + L"\n\n" +
       L"完整日志位置（请附带此文件到 GitHub Issue）：\n" + path_w +
       L"\n\n最近 30 行日志：\n" + Utf8ToWide(tail);
-  MessageBoxW(nullptr, body.c_str(), L"TypeAnything 安装失败",
+  MessageBoxW(nullptr, body.c_str(), L"Chatou 安装失败",
               MB_OK | MB_ICONERROR);
 }
 
@@ -351,7 +351,7 @@ static std::string PickInstallDir(HWND parent, const std::wstring& start) {
   DWORD opt = 0;
   dlg->GetOptions(&opt);
   dlg->SetOptions(opt | FOS_PICKFOLDERS | FOS_PATHMUSTEXIST | FOS_FORCEFILESYSTEM);
-  dlg->SetTitle(L"选择 TypeAnything 安装位置");
+  dlg->SetTitle(L"选择 Chatou 安装位置");
   if (!start.empty()) {
     // Try to set initial folder. Best-effort: walk up until a path exists.
     std::filesystem::path p(start);
@@ -408,7 +408,7 @@ static void WriteUninstallRegistry(const fs::path& install_dir,
                                    const std::wstring& version_str) {
   HKEY h;
   if (RegCreateKeyExW(HKEY_LOCAL_MACHINE,
-                      L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\TypeAnything",
+                      L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Chatou",
                       0, NULL, 0, KEY_WRITE | KEY_WOW64_64KEY, NULL, &h, NULL)
       != ERROR_SUCCESS) {
     return;
@@ -422,14 +422,14 @@ static void WriteUninstallRegistry(const fs::path& install_dir,
   };
   std::wstring uninst_exe = (install_dir / L"uninstall.exe").wstring();
   std::wstring quoted_cmd = L"\"" + uninst_exe + L"\" /uninstall";
-  sz(h, L"DisplayName", L"TypeAnything 输入法");
+  sz(h, L"DisplayName", L"Chatou 插头输入法");
   sz(h, L"DisplayVersion", version_str);
-  sz(h, L"Publisher", L"HRDAI");
+  sz(h, L"Publisher", L"Chatou contributors");
   sz(h, L"InstallLocation", install_dir.wstring());
   sz(h, L"UninstallString", quoted_cmd);
   sz(h, L"DisplayIcon", uninst_exe);
   sz(h, L"URLInfoAbout",
-     L"https://github.com/A-cat-with-carrots/TypeAnything");
+     L"https://github.com/gjz1023984937-dev/chatou");
   dw(h, L"NoModify", 1);
   dw(h, L"NoRepair", 1);
   RegCloseKey(h);
@@ -443,7 +443,7 @@ static fs::path RimeUserDir() {
   return fs::path(root) / L"Rime";
 }
 
-// Base64 encode raw bytes. Used to inline fish.png into the HTML so we
+// Base64 encode raw bytes. Used to inline chatou.png into the HTML so we
 // don't need to extract files for the installer's own webview UI.
 static std::string Base64(const unsigned char* data, size_t len) {
   static const char* tbl = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -506,15 +506,15 @@ static std::string BuildInlineHtml() {
       html.replace(pos, needle.size(), "<script>\n" + js + "\n</script>");
     }
   }
-  // Replace fish.png references with data: URL.
+  // Replace chatou.png references with data: URL.
   if (png_ptr && png_sz > 0) {
     std::string b64 = Base64((const unsigned char*)png_ptr, (size_t)png_sz);
     std::string data_url = "data:image/png;base64," + b64;
     for (const std::string& ref : {
-            std::string("href=\"fish.png\""),
-            std::string("src=\"fish.png\""),
-            std::string("url(\"fish.png\")"),
-            std::string("url(fish.png)") }) {
+            std::string("href=\"chatou.png\""),
+            std::string("src=\"chatou.png\""),
+            std::string("url(\"chatou.png\")"),
+            std::string("url(chatou.png)") }) {
       size_t pos = 0;
       while ((pos = html.find(ref, pos)) != std::string::npos) {
         std::string repl;
@@ -635,7 +635,7 @@ static bool StartDeElevated(const fs::path& exe_path) {
 // Standard Weasel MSI runs `regsvr32 weaselx64.dll` post-extract to register
 // the TSF Text Service. On cold machines (never had Weasel/Rime) the
 // HKLM\SOFTWARE\Microsoft\CTF\TIP\{A3F4CDED-…} CLSID subtree doesn't exist,
-// and Win+Space won't show TypeAnything until we register it.
+// and Win+Space won't show Chatou until we register it.
 //
 // DllRegisterServer is idempotent — calling on already-registered system
 // just rewrites the same HKCR / HKLM entries.
@@ -708,7 +708,7 @@ static bool TsfAlreadyRegistered() {
 
 // ─── Start Menu shortcut ────────────────────────────────────────
 //
-// `Win+Space → TypeAnything` works once TSF is registered, but if the
+// `Win+Space → Chatou` works once TSF is registered, but if the
 // WeaselServer backend isn't running (no tray icon → no menu), the user
 // has no entry point. A Start Menu .lnk → WeaselServer.exe gives them a
 // one-click "start the IME backend" with zero UI side-effects.
@@ -767,7 +767,7 @@ static void PatchTsfProfileDescriptions() {
     HKEY h;
     if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, prof.c_str(), 0,
                       KEY_WRITE | KEY_WOW64_64KEY, &h) == ERROR_SUCCESS) {
-      const wchar_t* desc = L"TypeAnything";
+      const wchar_t* desc = L"Chatou 插头";
       RegSetValueExW(h, L"Description", 0, REG_SZ,
                      (const BYTE*)desc,
                      (DWORD)((wcslen(desc) + 1) * sizeof(wchar_t)));
@@ -963,7 +963,7 @@ static void DoInstall(InstallOptions opts) {
       {MAKEINTRESOURCEW(IDR_TARGET_UI_HTML), L"index.html"},
       {MAKEINTRESOURCEW(IDR_TARGET_UI_CSS),  L"style.css"},
       {MAKEINTRESOURCEW(IDR_TARGET_UI_JS),   L"app.js"},
-      {MAKEINTRESOURCEW(IDR_TARGET_UI_PNG),  L"fish.png"},
+      {MAKEINTRESOURCEW(IDR_TARGET_UI_PNG),  L"chatou.png"},
     };
     for (auto& u : ui_files) {
       bool ok = WriteEmbeddedToFile(u.res, ui / u.leaf);
@@ -1072,7 +1072,7 @@ static void DoInstall(InstallOptions opts) {
                      "bytes=" + (stec ? "0" : std::to_string(fsz)));
     }
 
-    // 12. Default custom.yaml — pin the schema list to TypeAnything, set
+    // 12. Default custom.yaml — pin the schema list to Chatou, set
     // menu page_size to 7 (Microsoft-IME parity), and force non-inline
     // preedit in Office apps where inline-mode TSF caret reporting is
     // broken (candidate bar would otherwise pin to the window's top-left).
@@ -1128,7 +1128,7 @@ static void DoInstall(InstallOptions opts) {
     {
       std::ofstream wf(wcust, std::ios::binary | std::ios::trunc);
       wf <<
-        "# Managed by TypeAnything installer — Microsoft-IME-style layout.\n"
+        "# Managed by Chatou installer — Microsoft-IME-style layout.\n"
         "# NOTE: Weasel's layout calculation reads style/layout/*, NOT the\n"
         "# top-level style/* fields for spacing/padding/margin. Only font_*\n"
         "# and color_scheme propagate from style/* — the rest must go under\n"
@@ -1151,7 +1151,7 @@ static void DoInstall(InstallOptions opts) {
         "  \"style/layout/border_width\": 1\n"
         "  \"style/layout/corner_radius\": 4\n"
         "  \"preset_color_schemes/typeanything_light\":\n"
-        "    name: TypeAnything Light\n"
+        "    name: Chatou Light\n"
         "    author: HRDAI\n"
         "    back_color: 0xFFFFFF\n"
         "    border_color: 0xCCCCCC\n"
@@ -1304,7 +1304,7 @@ static void DoInstall(InstallOptions opts) {
   // 19. Cold-register weaselx64.dll as a TSF text service.
   //    Standard Weasel MSI does this via regsvr32 — ta-installer must do
   //    it itself on cold machines, otherwise Win+Space won't show
-  //    TypeAnything. Idempotent on already-registered systems.
+  //    Chatou. Idempotent on already-registered systems.
   //
   //    Failure is fatal ONLY when the TIP CLSID subtree is also missing.
   //    On upgrade installs (prior Weasel/Rime registered the CLSID
@@ -1329,7 +1329,7 @@ static void DoInstall(InstallOptions opts) {
         InstallLog("19. cold-register weaselx64.dll",
                    "FATAL — TIP CLSID missing after register attempt");
         std::string msg =
-            "无法把 TypeAnything 注册到 Windows 输入法框架（" + diag +
+            "无法把 Chatou 注册到 Windows 输入法框架（" + diag +
             "）。通常是杀软 / EDR / GPO 拦截，或 weaselx64.dll 缺依赖。";
         ShowFailureDialog(msg);
         PushStatus(84, msg, "DllRegisterServer 失败: " + diag,
@@ -1374,7 +1374,7 @@ static void DoInstall(InstallOptions opts) {
                    (langprof_ok ? "yes" : "NO"));
     if (!clsid_ok || !langprof_ok) {
       ShowFailureDialog(
-          "TSF CLSID 注册不完整 — Win+Space 将看不到 TypeAnything。");
+          "TSF CLSID 注册不完整 — Win+Space 将看不到 Chatou。");
       PushStatus(84, "TSF 注册不完整",
                  "TIP CLSID / LanguageProfile 缺失", "error", false,
                  "TSF registration incomplete");
@@ -1384,13 +1384,13 @@ static void DoInstall(InstallOptions opts) {
 
   // 21. Patch HKLM TSF profile descriptions (now that the TIP CLSID
   //    subtree exists from step 19/20 above).
-  PushStatus(86, "改写输入法显示名称 …", "TSF 描述改写为 TypeAnything");
+  PushStatus(86, "改写输入法显示名称 …", "TSF 描述改写为 Chatou 插头");
   PatchTsfProfileDescriptions();
   InstallLog("21. patch TSF profile descriptions",
-             "ok (description=TypeAnything)");
+             "ok (description=Chatou 插头)");
 
   // 22. Drop other schemas from Weasel data dir (keep luna_pinyin + typeanything).
-  PushStatus(88, "仅保留 TypeAnything 方案 …", "隐藏其他 Rime 方案");
+  PushStatus(88, "仅保留 Chatou 方案 …", "隐藏其他 Rime 方案");
   {
     fs::path data = wdir / L"data";
     fs::path orig = wdir / L"data.original";
@@ -1575,18 +1575,27 @@ static void DoInstall(InstallOptions opts) {
 
     // 31. Add/Remove Programs entry.
     WriteUninstallRegistry(wdir, L"0.8.1");
+    // This is an in-place upgrade from TypeAnything. Remove the legacy
+    // Add/Remove Programs entry so Windows does not show two products.
+    RegDeleteKeyExW(
+        HKEY_LOCAL_MACHINE,
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\TypeAnything",
+        KEY_WOW64_64KEY, 0);
     InstallLog("31. write Uninstall registry",
-               "ok (HKLM\\...\\Uninstall\\TypeAnything)");
+               "ok (HKLM\\...\\Uninstall\\Chatou)");
   }
 
   // 32. Start Menu shortcut → WeaselServer.exe. User-facing "start the
   //     input method" entry. Lives in the all-users Start Menu so it
   //     shows up for every account on the machine.
-  PushStatus(98, "创建开始菜单快捷方式 …", "开始菜单 → TypeAnything");
+  PushStatus(98, "创建开始菜单快捷方式 …", "开始菜单 → Chatou");
   {
-    fs::path lnk = StartMenuProgramsAllUsers() / L"TypeAnything.lnk";
+    fs::path lnk = StartMenuProgramsAllUsers() / L"Chatou.lnk";
     bool lnk_ok = CreateLnk(wdir / L"WeaselServer.exe", lnk,
-                            L"启动 TypeAnything 输入法");
+                            L"启动 Chatou 插头输入法");
+    // Remove the old shortcut after the new one exists.
+    std::error_code legacy_ec;
+    fs::remove(StartMenuProgramsAllUsers() / L"TypeAnything.lnk", legacy_ec);
     InstallLog("32. create Start Menu shortcut",
                std::string(lnk_ok ? "ok " : "warning ") + "path=" +
                    WideToUtf8(lnk.wstring()));
@@ -1693,14 +1702,17 @@ static void DoUninstall() {
 
   // Remove Start Menu shortcut.
   {
-    fs::path lnk = StartMenuProgramsAllUsers() / L"TypeAnything.lnk";
+    fs::path lnk = StartMenuProgramsAllUsers() / L"Chatou.lnk";
     std::error_code ec; fs::remove(lnk, ec);
+    fs::remove(StartMenuProgramsAllUsers() / L"TypeAnything.lnk", ec);
   }
 
   PushStatus(15, "撤销注册表项 …", "Run / Uninstall / WeaselRoot");
   DeleteRegValue64(HKEY_LOCAL_MACHINE,
                    L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
                    L"WeaselServer");
+  DeleteRegKey64(HKEY_LOCAL_MACHINE,
+                 L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Chatou");
   DeleteRegKey64(HKEY_LOCAL_MACHINE,
                  L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\TypeAnything");
   // WeaselRoot — keep until LAST so that anything reading it during
@@ -1884,10 +1896,10 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR lpCmdLine, int) {
     // bother spinning up WebView2.
     int yn = MessageBoxW(
         NULL,
-        L"确定要卸载 TypeAnything 输入法吗？\n\n"
+        L"确定要卸载 Chatou 插头输入法吗？\n\n"
         L"会清除安装目录与系统注册项。\n"
         L"用户字典与个人配置（%APPDATA%\\Rime）会保留。",
-        L"卸载 TypeAnything",
+        L"卸载 Chatou",
         MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2);
     if (yn != IDYES) {
       ::CoUninitialize();
@@ -1898,12 +1910,12 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR lpCmdLine, int) {
   // Force a writable WebView2 user data folder (Program Files is read-only).
   wchar_t lad[MAX_PATH] = {0};
   if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, lad))) {
-    std::wstring ud = std::wstring(lad) + L"\\TypeAnything\\WebView2-installer";
+    std::wstring ud = std::wstring(lad) + L"\\Chatou\\WebView2-installer";
     std::error_code ec; fs::create_directories(ud, ec);
     SetEnvironmentVariableW(L"WEBVIEW2_USER_DATA_FOLDER", ud.c_str());
   }
 
-  // Materialize inline UI to %LOCALAPPDATA%\TypeAnything\installer-ui\index.html
+  // Materialize inline UI to %LOCALAPPDATA%\Chatou\installer-ui\index.html
   // and navigate the webview to it via file://. Avoids the data: URL nesting
   // and length limits we hit when calling set_html() with embedded base64.
   std::wstring local_appdata;
@@ -1913,7 +1925,7 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR lpCmdLine, int) {
       local_appdata = buf;
     }
   }
-  fs::path ui_dir = fs::path(local_appdata) / L"TypeAnything" / L"installer-ui";
+  fs::path ui_dir = fs::path(local_appdata) / L"Chatou" / L"installer-ui";
   std::error_code ui_ec;
   fs::create_directories(ui_dir, ui_ec);
   fs::path ui_html = ui_dir / L"index.html";
@@ -1933,7 +1945,7 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR lpCmdLine, int) {
   }
 
   webview::webview w(false, nullptr);
-  w.set_title(uninstall_mode ? "TypeAnything 卸载" : "TypeAnything 安装");
+  w.set_title(uninstall_mode ? "Chatou 卸载" : "Chatou 安装");
   // Fixed size — installer is a dialog, not a resizeable workspace.
   // Also dodges WebView2 user-data window-state persistence quirks.
   w.set_size(680, 430, WEBVIEW_HINT_FIXED);

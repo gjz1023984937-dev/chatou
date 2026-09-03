@@ -1,4 +1,4 @@
--- ta-settings: WebView2 + HTML settings UI for TypeAnything tray menu items.
+-- ta-settings: WebView2 + HTML settings UI for Chatou tray menu items.
 -- Builds an isolated win32 .exe that the IME spawns when user clicks
 -- "切换语言" or "模型配置".
 

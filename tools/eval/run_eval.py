@@ -1,4 +1,4 @@
-"""TypeAnything chip eval v2 — 40 chip × 4 sentences through one of four
+"""Chatou chip eval v2 — 40 chip × 4 sentences through one of four
 hardcoded prompts (A/B/C/D) per chip's pre-assigned category. Mirrors the
 production architecture: classify at chip-save time (here just a static
 table since the 40 chips are internal), then translate with the

@@ -1,10 +1,10 @@
 #requires -RunAsAdministrator
 <#
-Install TypeAnything: custom rime.dll + Weasel UI binaries + schema + rebrand.
+Install Chatou: custom rime.dll + Weasel UI binaries + schema + rebrand.
 
 Run from admin PowerShell:
   cd D:\hrdai\aiForType
-  .\install-typeanything-to-weasel.ps1 -ApiKey "sk-xxxx"
+  .\install-chatou-to-weasel.ps1 -ApiKey "sk-xxxx"
 #>
 
 param(
@@ -145,7 +145,7 @@ foreach ($p in $pairs) {
 
 # TSF reads the language-bar IconFile from a separate copy in system32\weasel.dll
 # (registered at install time by Weasel's MSI). Update it too so the tray icon
-# becomes the angelfish, not the original Weasel glyph.
+    # uses the Chatou brand instead of the original Weasel glyph.
 $sys32Dll = "C:\WINDOWS\system32\weasel.dll"
 $sys32Bak = "$sys32Dll.bak"
 if ((Test-Path $sys32Dll) -and -not (Test-Path $sys32Bak)) {
@@ -193,7 +193,7 @@ if (-not $taExeSrc) {
     $uiDst = Join-Path $WeaselDir "ui"
     if (Test-Path $uiSrc) {
         New-Item -ItemType Directory -Force -Path $uiDst | Out-Null
-        foreach ($f in @("index.html", "style.css", "app.js", "fish.png")) {
+        foreach ($f in @("index.html", "style.css", "app.js", "chatou.png")) {
             $s = Join-Path $uiSrc $f
             if (Test-Path $s) { Copy-Item $s (Join-Path $uiDst $f) -Force }
         }
@@ -223,13 +223,13 @@ patch:
 "@
 $customContent | Set-Content -Path (Join-Path $RimeUserDir "default.custom.yaml") -Encoding UTF8
 
-Write-Host "==> Rebrand TSF profile descriptions to TypeAnything"
+Write-Host "==> Rebrand TSF profile descriptions to Chatou"
 $root = "HKLM:\SOFTWARE\Microsoft\CTF\TIP\$WeaselClsid\LanguageProfile"
 if (Test-Path $root) {
     Get-ChildItem $root -ErrorAction SilentlyContinue | ForEach-Object {
         $profKeyPath = Join-Path $_.PSPath $ProfileGuid
         if (Test-Path $profKeyPath) {
-            Set-ItemProperty -Path $profKeyPath -Name "Description" -Value "TypeAnything" -Type String -ErrorAction SilentlyContinue
+            Set-ItemProperty -Path $profKeyPath -Name "Description" -Value "Chatou 插头" -Type String -ErrorAction SilentlyContinue
         }
     }
 }
@@ -273,7 +273,7 @@ Start-Process (Join-Path $WeaselDir "WeaselServer.exe")
 # TSF picks up new Description on next session/login or when language bar is
 # refreshed. We avoid restarting explorer (causes the visible black flash and
 # spurious folder windows). User can sign out + back in to see new name in the
-# Win+Space menu, OR just wait — new apps already see TypeAnything.
+# Win+Space menu, OR just wait — new apps already see Chatou.
 
 if ($script:RebootNeeded) {
     Write-Host ""

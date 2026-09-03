@@ -1,6 +1,6 @@
 @echo off
 rem ============================================================
-rem TypeAnything one-click installer
+rem Chatou one-click installer
 rem Double-click this file. UAC will prompt for elevation, then a
 rem dialog box asks for your DeepSeek API key. After that, the
 rem PowerShell installer drops the binaries into your Weasel
@@ -19,11 +19,11 @@ if %errorlevel% neq 0 (
 
 echo.
 echo ============================================================
-echo  TypeAnything Installer
+echo  Chatou Installer
 echo ============================================================
 echo.
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Install-TypeAnything.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Install-Chatou.ps1"
 
 echo.
 pause

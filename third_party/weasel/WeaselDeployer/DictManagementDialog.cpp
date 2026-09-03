@@ -134,7 +134,8 @@ LRESULT DictManagementDialog::OnBackup(WORD, WORD code, HWND, BOOL&) {
 }
 
 LRESULT DictManagementDialog::OnRestore(WORD, WORD code, HWND, BOOL&) {
-  CString open_str, dict_snapshot_str, kcss_dict_snapshot_str, all_files_str;
+  ATL::CString open_str, dict_snapshot_str, kcss_dict_snapshot_str,
+      all_files_str;
   open_str.LoadStringW(IDS_STR_OPEN);
   dict_snapshot_str.LoadStringW(IDS_STR_DICT_SNAPSHOT);
   kcss_dict_snapshot_str.LoadStringW(IDS_STR_KCSS_DICT_SNAPSHOT);
@@ -168,7 +169,7 @@ LRESULT DictManagementDialog::OnRestore(WORD, WORD code, HWND, BOOL&) {
 }
 
 LRESULT DictManagementDialog::OnExport(WORD, WORD code, HWND, BOOL&) {
-  CString save_as_str, exported_str, record_count_str, all_files_str,
+  ATL::CString save_as_str, exported_str, record_count_str, all_files_str,
       txt_files_str;
   save_as_str.LoadStringW(IDS_STR_SAVE_AS);
   exported_str.LoadStringW(IDS_STR_EXPORTED);
@@ -219,7 +220,7 @@ LRESULT DictManagementDialog::OnExport(WORD, WORD code, HWND, BOOL&) {
 }
 
 LRESULT DictManagementDialog::OnImport(WORD, WORD code, HWND, BOOL&) {
-  CString open_str, imported_str, record_count_str, all_files_str,
+  ATL::CString open_str, imported_str, record_count_str, all_files_str,
       txt_files_str;
   open_str.LoadStringW(IDS_STR_OPEN);
   imported_str.LoadStringW(IDS_STR_IMPORTED);

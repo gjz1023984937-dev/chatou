@@ -1,4 +1,4 @@
--- ta-installer: single-exe bundled installer for TypeAnything.
+-- ta-installer: single-exe bundled installer for Chatou.
 -- Embeds Weasel binaries + ta-settings + ui + schema yaml as RT_RCDATA.
 --
 -- The resource embedding is done OUTSIDE xmake by _stage_embed.ps1, which

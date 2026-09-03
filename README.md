@@ -1,4 +1,8 @@
-# TypeAnything
+# Chatou 插头
+
+<p align="center">
+  <img src="branding/chatou-logo.png" width="128" alt="Chatou logo">
+</p>
 
 > **打拼音，落地任何语言、任何圈层、任何风格。**
 > Type Chinese pinyin → press F8 → AI rewrites it as English / 留学生式中英夹杂 / 金融式说话 / 学术体 / 港片台词 / Klingon — anything you can describe. Enter remains the host application's normal submit/newline key.
@@ -84,7 +88,7 @@ B站弹幕体 / 抖音口播体 / 朋友圈鸡汤体 / 营销号体
 Klingon battle prose / 火星文 / Spanish chilango / Cockney slang
 ```
 
-**你能用一句话描述的口吻，TypeAnything 就能给你那个口吻。**
+**你能用一句话描述的口吻，Chatou 就能给你那个口吻。**
 
 ---
 
@@ -92,7 +96,7 @@ Klingon battle prose / 火星文 / Spanish chilango / Cockney slang
 
 跨语言/跨圈层协作的真正瓶颈不在「会不会说英文」「认不认识黑话」，在**打字速度 + 切换成本**——你能用拼音 250 字/分钟想出来的句子，硬要套进金融狗中英夹杂模板就剩 60 字/分钟。市面解法的通病：
 
-| 通病 | TypeAnything 改进 |
+| 通病 | Chatou 改进 |
 |------|--------------------|
 | 翻译插件只做语种切换（中→英） | **AI 改写**：语种 / 圈层 / 时代 / 文体 / 自定义任意切 |
 | 浏览器插件方案只在 web 内有效 | **OS 级 TSF**，微信/Word/任何原生 app 都生效 |
@@ -101,7 +105,7 @@ Klingon battle prose / 火星文 / Spanish chilango / Cockney slang
 | 谷歌输入法 + 翻译只支持 1-2 语言 | **任意自然语言描述**，1 秒切换风格 |
 | 翻译质量靠默认 prompt（直译生硬） | **5 条 rule 专业翻译 prompt** + 风格描述 pass-through |
 | 阻塞 LLM 调用导致 UI 卡死 | **后台 worker + 版本号校验**，用户继续打字不阻塞 |
-| 鬼图标 / 维护中托盘气泡 / 12 项菜单噪音 | **托盘 4 项极简** + 神仙鱼品牌图标 |
+| 鬼图标 / 维护中托盘气泡 / 12 项菜单噪音 | **托盘 4 项极简** + Chatou 品牌图标 |
 | 安装要装 7 个组件、改 5 个注册表 | **一条命令**完成 binary 替换 + schema 部署 + TSF 注册 |
 | 上锁文件无法替换需手动重启 | **MoveFileEx pending-on-reboot** 自动兜底 |
 
@@ -115,7 +119,7 @@ Klingon battle prose / 火星文 / Spanish chilango / Cockney slang
 │   ↓                                                 │
 │  Weasel TSF DLL → librime engine → 「你好」         │
 │   ↓ commit_notifier 触发                            │
-│  TypeAnything Rime processor 累积「你好」           │
+│  Chatou Rime processor 累积「你好」                 │
 └─────────────────────────────────────────────────────┘
                       ↓ [F8]
 ┌─ 后台异步 ──────────────────────────────────────────┐
@@ -154,39 +158,39 @@ Klingon battle prose / 火星文 / Spanish chilango / Cockney slang
 - [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) — Win10 20H1+ / Win11 默认已装，老版本 Win10 需手动装一次
 - AI API key — 默认走 [DeepSeek](https://platform.deepseek.com/)（性价比 + 中文质量好），可换 OpenAI / Anthropic / 任意 OpenAI-compatible API（装完后在「模型配置」面板填）
 
-> Weasel 不用先装。`ta-installer.exe` 自带 Weasel 0.17.4 全套二进制 + librime + TypeAnything 插件，一次装完。
+> Weasel 不用先装。`Chatou-Installer.exe` 自带 Weasel 0.17.4 全套二进制 + librime + Chatou 插件，一次装完。
 
 ### 一键安装（推荐）
 
-1. 下载最新 release 的 `ta-installer.exe`：
-   <https://github.com/A-cat-with-carrots/TypeAnything/releases/latest>
-2. 双击 `ta-installer.exe` — UAC 提权
+1. 下载最新 release 的 `Chatou-Installer.exe`：
+   <https://github.com/gjz1023984937-dev/chatou/releases/latest>
+2. 双击 `Chatou-Installer.exe` — UAC 提权
 3. 选安装目录（默认 `C:\Program Files\Rime\weasel-0.17.4\`）→ 「开始安装」
 4. 等进度条到 100% → 「配置模型」按钮直接弹模型配置面板，填 API key 保存
-5. Win+Space 切到 **TypeAnything**
+5. Win+Space 切到 **Chatou 插头**
 
 **装完不需要注销重登 / 重启电脑** — 新打开的应用立即生效，已开的应用需关掉重开。
 
 ### 卸载
 
-控制面板 → 程序和功能 → 找到「TypeAnything」→ 卸载。或直接跑安装目录里的 `uninstall.exe`。用户字典与个人配置（`%APPDATA%\Rime`）会保留，方便日后重装时延用。
+控制面板 → 程序和功能 → 找到「Chatou 插头输入法」→ 卸载。或直接运行安装目录里的 `uninstall.exe`。用户字典与个人配置（`%APPDATA%\Rime`）会保留，方便日后重装时延用。
 
 ### 从源码自行构建
 
 ```powershell
 choco install -y visualstudio2022buildtools python
-# Boost 1.84 prebuilt 装到 C:\local\boost_1_84_0
+# Boost 1.84 与 WTL 可放到仓库同级的 dependencies 目录，或设置 BOOST_ROOT / WTL_ROOT
 Invoke-Expression (Invoke-Webrequest 'https://xmake.io/psget.text' -UseBasicParsing).Content
 
-git clone https://github.com/A-cat-with-carrots/TypeAnything.git
-cd TypeAnything\third_party\weasel\librime
+git clone https://github.com/gjz1023984937-dev/chatou.git
+cd chatou\third_party\weasel\librime
 git submodule update --init --recursive
 .\build.bat librime         # → dist\lib\rime.dll
 
-cd ..
+cd ..\..\..
 .\_build_weasel_xmake.ps1   # → Weasel binary 套件
 
-cd ..\..\tools\ta-settings
+cd tools\ta-settings
 .\_build.ps1                # → ta-settings.exe（设置面板）
 
 cd ..\ta-installer
@@ -199,7 +203,7 @@ cd ..\ta-installer
 2. Kill 现有 Weasel 进程 + `MoveFileEx` pending-on-reboot 兜底
 3. 写 binaries 到选定安装目录（备份原版到 `*.bak`）+ 替换 `system32\weasel.dll`
 4. 写 `typeanything.schema.yaml` + `typeanything.dict.yaml` + `default.custom.yaml` + `weasel.custom.yaml` 到 `%APPDATA%\Rime\`
-5. patch TSF 注册表 IME 描述为 `TypeAnything`
+5. patch TSF 注册表 IME 描述为 `Chatou 插头`
 6. `WeaselDeployer.exe /deploy` 编译 schema（轮询 `typeanything.prism.bin` ≤ 60s）
 7. 启 `WeaselServer.exe` 上托盘
 8. 写 HKLM\Run 自启动 + Add/Remove Programs entry + 拷贝自身为 `uninstall.exe`
@@ -211,7 +215,7 @@ cd ..\ta-installer
 ### 基本流程
 
 ```
-1. Win+Space 切到 TypeAnything
+1. Win+Space 切到 Chatou 插头
 2. 任意输入框打拼音：women xia zhou yao kaihui
 3. Space 选词 → 「我们下周要开会」
 4. F8 → 中文消失 → 落地为目标风格（Enter 仍正常发送/换行）
@@ -286,10 +290,10 @@ schema 覆盖 punctuator preset，对齐 Microsoft IME 行为：
 ## 文件结构
 
 ```
-TypeAnything/
+chatou/
 ├── README.md                                    本文档
 ├── LICENSE                                      MIT
-├── fish.ico                                    神仙鱼品牌图标
+├── branding/                                   Chatou logo 与品牌说明
 ├── tools/
 │   ├── ta-installer/                           ★ 单 exe 安装器（含全部资源 embed）
 │   │   ├── main.cpp                            UAC + 安装 / 卸载 worker
@@ -300,17 +304,17 @@ TypeAnything/
 │   │   └── _stage_embed.ps1 + _build.ps1
 │   └── ta-settings/                            ★ 托盘菜单「切换风格」+「模型配置」WebView2 面板
 │       ├── main.cpp                            webview 宿主 + JS↔C++ bridge
-│       ├── app.rc                              fish.ico embed → 窗口 / 任务栏图标
+│       ├── app.rc                              chatou.ico embed → 窗口 / 任务栏图标
 │       ├── ui/
 │       │   ├── index.html                      SPA: ?page=lang | ?page=model
 │       │   ├── style.css                       hrdai dark editorial (teal+金)
 │       │   ├── app.js                          chips/preset 逻辑 + bridge 调用
-│       │   └── fish.png                        title bar logo
+│       │   └── chatou.png                      title bar logo
 │       ├── vendor/
 │       │   ├── webview.h                       zserge/webview v0.10 single-header MIT
 │       │   └── webview2/                       Microsoft.Web.WebView2 SDK
 │       ├── xmake.lua + _build.ps1              build script
-│       └── fish.ico
+│       └── chatou.ico
 └── third_party/
     └── weasel/                                  fork 自 rime/weasel
         ├── WeaselServer/
@@ -320,7 +324,7 @@ TypeAnything/
         │   └── WeaselTSF.rc                     ★ 3 项菜单
         ├── WeaselUI/
         │   └── WeaselPanel.cpp                  ★ 候选窗 status icon 关掉
-        ├── resource/                            ★ 6 个 ICO 神仙鱼 + 中/A 模式徽章
+        ├── resource/                            ★ 输入法状态图标资源
         ├── include/
         │   └── resource.h                       ★ ID_WEASELTRAY_SWITCH_LANG + MODEL_CONFIG
         └── librime/plugins/typeanything/        ★ 我们的 Rime 插件
@@ -333,7 +337,7 @@ TypeAnything/
             └── CMakeLists.txt
 ```
 
-★ = TypeAnything 改动 / 新增。
+★ = Chatou 改动 / 新增。
 
 ---
 
@@ -370,7 +374,13 @@ typeanything:
 
 ## 版本历史
 
-### v0.7.3（当前）
+### v0.8.1（当前）
+- **Chatou 品牌升级**：界面、安装器、Windows 输入法名称、更新源和应用图标统一为 Chatou / 插头
+- **兼容原有数据**：保留 `typeanything.*` 配置文件、schema id 与 TSF GUID，原设置可以原地升级
+- **全局 F8 翻译**：在 Word、记事本及主流浏览器输入框中使用 F8；Enter 恢复为宿主应用正常发送/换行
+- **全新设置与安装界面**：Windows 11 风格布局，更清楚地分离“切换风格”和“模型配置”
+
+### v0.7.3
 - **蓝白配色**：设置面板从暖灰咖（Claude 风）改为 GitHub 蓝白 — `#FAFBFC` 底 / `#0969DA` accent / `#1F2328` 主文字 / `#57606A` 次文字
 - **托盘菜单光标修复**：「切换风格」「模型配置」「检查更新」hover 时不再变为左右双向箭头（owner 窗口 `WNDCLASSEX.hCursor = NULL` → `LoadCursor(NULL, IDC_ARROW)`）
 - **仓库路径迁移**：build 脚本 + `installer.rc` 跟随 `aiForType/` → `products/TypeAnything/`
@@ -393,14 +403,14 @@ typeanything:
 - **Claude UI 风格**：设置面板从 hrdai dark editorial 改为 Claude 暖灰咖（v0.7.3 又改为蓝白）
 
 ### v0.6.5
-- **冷装修复**：installer cold-register TSF + bundle luna_pinyin 全套数据 + 安装失败真报错（不再 silent 100%）+ 写开始菜单 `TypeAnything.lnk → WeaselServer.exe`
+- **冷装修复**：installer cold-register TSF + bundle luna_pinyin 全套数据 + 安装失败真报错（不再 silent 100%）+ 写开始菜单快捷方式
 - **WeaselServer 跑 MEDIUM IL**（`CreateProcessWithTokenW` + explorer token）让 IME 在普通应用（Notepad / 微信 / Chrome / Word）正常工作，pipe ACL 不再被拒
 - **设置面板单实例 + tab 切换 + 强制置顶**：托盘点「切换风格」/「模型配置」复用现有窗口，`AttachThreadInput` 技巧绕过 SetForegroundWindow 限制
 - **每 provider 独立 API key**：`%APPDATA%\Rime\typeanything.keyring.json` 存 DeepSeek/Moonshot/智谱/OpenAI/Ollama/custom 各自 key，切 preset 不再串
 - **自定义 preset**：清空 placeholder + 字段，用户从零填
 - **当前 provider 标识**：`.preset.current` 金底 +「当前」角标 = runtime 实际在用的那个
 - **候选框样式调优**：style/layout/* 字段（而非顶级 style/*）才真正驱动 layout — font 11pt YaHei UI、margin 8/6、hilite_padding 4、candidate_spacing 24、金色 mark
-- **WeaselServer 版本从 registry 读**：`HKLM\...\Uninstall\TypeAnything\DisplayVersion` 单一来源，发版只改 installer 一处
+- **WeaselServer 版本从 registry 读**：从卸载注册表的 `DisplayVersion` 读取，发版只改 installer 一处
 - **检查更新弹窗 MB_TOPMOST + MB_SETFOREGROUND**：不再藏到后台
 - **`taskkill /T` flag 去掉**：避免 ta-settings（WeaselServer 子进程）被一起 kill
 
@@ -417,10 +427,10 @@ typeanything:
 ### v0.5
 - **WebView2 设置面板** — 托盘的「切换风格」+「模型配置」从 PowerShell InputBox / WinForms 改为独立 `ta-settings.exe` 嵌 WebView2 + HTML/CSS
   - hrdai dark editorial 设计（teal `#15212a` + 金 `#d4b27a`，Noto Serif SC 衬线 + Inter sans）
-  - 神仙鱼 ICO 嵌入资源 → 窗口 / 任务栏图标
+  - 品牌 ICO 嵌入资源 → 窗口 / 任务栏图标
   - chip / preset hover 金描边、active 金底深字
   - JS ↔ C++ bridge：read/write schema yaml & lang.txt，保存自动重启 WeaselServer
-  - WebView2 user-data folder 强制走 `%LOCALAPPDATA%\TypeAnything\WebView2`（避开 Program Files 只读）
+  - WebView2 user-data folder 强制走 `%LOCALAPPDATA%\Chatou\WebView2`（避开 Program Files 只读）
   - 标点直输（schema yaml 覆盖 punctuator preset，对齐 Microsoft IME）
   - 取消所有 PowerShell spawn — 不再受 PS 冷启动 / 沙箱进程拦截影响
 
@@ -438,7 +448,7 @@ typeanything:
 
 ### v0.3
 - 30 语言托盘热切（English / 日本語 / 한국어 / 粵語 + 26 种）
-- 神仙鱼品牌图标全套
+- 初代品牌图标全套
 - 托盘菜单 4 项极简
 - 5 条 rule 专业翻译 prompt
 - 关闭候选窗 status icon
@@ -462,8 +472,9 @@ PR 前请阅 `third_party/weasel/librime/plugins/typeanything/src/typeanything_p
 
 - [rime/weasel](https://github.com/rime/weasel) — Windows TSF 框架，我们 fork 自此
 - [rime/librime](https://github.com/rime/librime) — Rime 输入法引擎
+- [A-cat-with-carrots/TypeAnything](https://github.com/A-cat-with-carrots/TypeAnything) — Chatou 的原始项目与功能基础
 - [DeepSeek](https://platform.deepseek.com/) — 默认 LLM provider（性价比高、中文好），用户可在 schema yaml 切到任意 OpenAI-compatible API
-- 神仙鱼 logo 来自 [hrdai.com](https://hrdai.com) 品牌系统
+- Chatou logo 为本项目重新设计，采用“插头 + 文本光标 + AI 星光”的识别符号
 
 ---
 

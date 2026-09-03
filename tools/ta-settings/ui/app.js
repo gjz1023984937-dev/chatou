@@ -1,4 +1,4 @@
-// TypeAnything settings UI — front-end logic + native bridge
+// Chatou settings UI — front-end logic + native bridge
 //
 // Native bridge functions (exposed by C++ via webview.bind):
 //   nativeReadSchema()                      → JSON {api_key, model, host, path}

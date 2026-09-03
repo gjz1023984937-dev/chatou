@@ -11,9 +11,10 @@ if (Test-Path $embed) { Remove-Item -Recurse -Force $embed }
 New-Item -ItemType Directory -Force -Path $embed,"$embed\target-ui","$embed\install-ui" | Out-Null
 
 # 1. Weasel binaries. Prefer fresh builds; fall back to the currently
-# installed TypeAnything shell when only librime was rebuilt.
+# installed Chatou shell when only librime was rebuilt.
 $buildBin = Join-Path $repoRoot "third_party\weasel\build\windows\x64\release"
-$installedRoot = $env:TYPEANYTHING_INSTALL_DIR
+$installedRoot = $env:CHATOU_INSTALL_DIR
+if (-not $installedRoot) { $installedRoot = $env:TYPEANYTHING_INSTALL_DIR }
 if (-not $installedRoot) {
     $runValue = (Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run" `
         -Name WeaselServer -ErrorAction SilentlyContinue).WeaselServer
@@ -49,12 +50,12 @@ if (-not (Test-Path $loader)) { throw "WebView2Loader.dll not found" }
 Copy-Item $loader "$embed\WebView2Loader.dll"
 
 # 3. target ui (for ta-settings to load post-install)
-foreach ($f in "index.html","style.css","app.js","fish.png") {
+foreach ($f in "index.html","style.css","app.js","chatou.png") {
     Copy-Item "$taBin\ui\$f" "$embed\target-ui\$f"
 }
 
 # 4. installer ui (this exe's own webview pages)
-foreach ($f in "index.html","style.css","app.js","fish.png") {
+foreach ($f in "index.html","style.css","app.js","chatou.png") {
     Copy-Item "$here\ui\$f" "$embed\install-ui\$f"
 }
 

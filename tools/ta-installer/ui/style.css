@@ -22,7 +22,7 @@ button { font: inherit; }
 
 .titlebar { height: 48px; display: flex; align-items: center; padding-left: 17px; background: rgba(255,255,255,.92); border-bottom: 1px solid var(--line); backdrop-filter: blur(18px); }
 .title { display: flex; align-items: center; gap: 9px; }
-.logo { width: 25px; height: 25px; background: url("fish.png") no-repeat center / contain; }
+.logo { width: 25px; height: 25px; background: url("chatou.png") no-repeat center / contain; }
 .brand { font-size: 13px; font-weight: 720; }
 .brand em { margin-left: 5px; padding: 2px 6px; color: var(--primary); background: var(--primary-soft); border-radius: 6px; font-size: 9px; font-style: normal; font-weight: 700; letter-spacing: .06em; }
 .window-controls { height: 48px; display: flex; margin-left: auto; }

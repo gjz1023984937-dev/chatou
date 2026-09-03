@@ -1,4 +1,4 @@
-// TypeAnything Installer — embedded resources.
+// Chatou Installer — embedded resources.
 //
 // Integer IDs (see resource.h) — works around string-name FindResource issues.
 // Paths are relative to this directory; _stage_embed.ps1 invokes rc.exe here.
@@ -9,7 +9,7 @@
 1 24 "manifest.xml"
 
 // Window / taskbar icon
-1 ICON "..\\ta-settings\\fish.ico"
+1 ICON "..\\ta-settings\\chatou.ico"
 
 // ───── Bundled binaries ─────────────────────────────────────────
 IDR_RIME_DLL        RCDATA "embed\\rime.dll"
@@ -23,7 +23,7 @@ IDR_WV2_LOADER      RCDATA "embed\\WebView2Loader.dll"
 IDR_TARGET_UI_HTML  RCDATA "embed\\target-ui\\index.html"
 IDR_TARGET_UI_CSS   RCDATA "embed\\target-ui\\style.css"
 IDR_TARGET_UI_JS    RCDATA "embed\\target-ui\\app.js"
-IDR_TARGET_UI_PNG   RCDATA "embed\\target-ui\\fish.png"
+IDR_TARGET_UI_PNG   RCDATA "embed\\target-ui\\chatou.png"
 
 // ───── Schema yaml + supplement dict ────────────────────────────
 IDR_SCHEMA_YAML     RCDATA "embed\\typeanything.schema.yaml"
@@ -33,7 +33,7 @@ IDR_DICT_YAML       RCDATA "embed\\typeanything.dict.yaml"
 IDR_INSTALL_HTML    RCDATA "embed\\install-ui\\index.html"
 IDR_INSTALL_CSS     RCDATA "embed\\install-ui\\style.css"
 IDR_INSTALL_JS      RCDATA "embed\\install-ui\\app.js"
-IDR_INSTALL_PNG     RCDATA "embed\\install-ui\\fish.png"
+IDR_INSTALL_PNG     RCDATA "embed\\install-ui\\chatou.png"
 
 // ───── Rime base data (for cold-install) ────────────────────────
 IDR_DATA_DEFAULT       RCDATA "embed\\default.yaml"

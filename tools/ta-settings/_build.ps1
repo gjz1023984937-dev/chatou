@@ -1,4 +1,4 @@
-# Build ta-settings.exe (WebView2 UI for TypeAnything tray menu items).
+# Build ta-settings.exe (WebView2 UI for Chatou tray menu items).
 
 $ErrorActionPreference = "Stop"
 $here = $PSScriptRoot

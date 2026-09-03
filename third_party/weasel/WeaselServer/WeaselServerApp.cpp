@@ -24,11 +24,11 @@ WeaselServerApp::WeaselServerApp()
 
 WeaselServerApp::~WeaselServerApp() {}
 
-// ─── TypeAnything in-app update check ────────────────────────────────
+// ─── Chatou in-app update check ─────────────────────────────────────
 //
 // Fallback version string. Runtime preferred source = `DisplayVersion`
 // value under HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\
-// TypeAnything (written by ta-installer on every install). See
+// Chatou (written by ta-installer on every install). See
 // GetInstalledVersion() below — this literal only kicks in when the
 // registry read fails (e.g. running from a dev build that never went
 // through the installer).
@@ -45,7 +45,7 @@ static std::wstring GetInstalledVersion() {
   HKEY h;
   if (RegOpenKeyExW(
           HKEY_LOCAL_MACHINE,
-          L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\TypeAnything",
+          L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Chatou",
           0, KEY_READ | KEY_WOW64_64KEY, &h) == ERROR_SUCCESS) {
     WCHAR buf[64] = {0};
     DWORD sz = sizeof(buf);
@@ -348,7 +348,7 @@ static void ShowGitHubErrorDialog(const wchar_t* lead) {
       L"\n\n常见原因：公司网络代理、GitHub API 限流、SSL 拦截。"
       L"\n\n点击\"是\"查看日志，点击\"否\"关闭。";
   int r = MessageBoxW(NULL, body.c_str(),
-                      L"TypeAnything 更新检查 — 查看日志？",
+                      L"Chatou 更新检查 — 查看日志？",
                       MB_YESNO | MB_ICONWARNING | MB_TOPMOST |
                           MB_SETFOREGROUND | MB_DEFBUTTON1);
   if (r == IDYES) {
@@ -360,10 +360,10 @@ static void ShowGitHubErrorDialog(const wchar_t* lead) {
 }
 
 bool check_update_worker() {
-  const wchar_t* UA = L"TypeAnything-Updater/1.0";
+  const wchar_t* UA = L"Chatou-Updater/1.0";
   const wchar_t* HOST = L"api.github.com";
   const wchar_t* PATH =
-      L"/repos/A-cat-with-carrots/TypeAnything/releases/latest";
+      L"/repos/gjz1023984937-dev/chatou/releases/latest";
 
   HttpsGetResult resp = HttpsGet(HOST, PATH, UA);
   if (resp.body.empty()) {
@@ -416,7 +416,7 @@ bool check_update_worker() {
     UpdateLog("check_update", HOST, PATH, resp.status_code, resp.body,
               parsed, "up to date (" + cur + ")");
     std::wstring msg = L"已是最新版本（" + wcur + L"）。";
-    MessageBoxW(NULL, msg.c_str(), L"TypeAnything 更新检查",
+    MessageBoxW(NULL, msg.c_str(), L"Chatou 更新检查",
                 MB_OK | MB_ICONINFORMATION | MB_TOPMOST | MB_SETFOREGROUND);
     return true;
   }
@@ -438,7 +438,7 @@ bool check_update_worker() {
       (release_name.empty() ? L"" : (L"  " + toWide(release_name))) +
       L"\n\n当前版本：" + wcur + L"\n\n立即下载并安装吗？";
   int r = MessageBoxW(NULL, prompt.c_str(),
-                      L"TypeAnything 更新可用",
+                      L"Chatou 更新可用",
                       MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND);
   if (r != IDYES) return true;
 
@@ -447,21 +447,21 @@ bool check_update_worker() {
   std::wstring wurl = toWide(dl_url);
   const std::wstring scheme = L"https://";
   if (wurl.compare(0, scheme.size(), scheme) != 0) {
-    MessageBoxW(NULL, L"下载链接格式异常。", L"TypeAnything 更新",
+    MessageBoxW(NULL, L"下载链接格式异常。", L"Chatou 更新",
                 MB_OK | MB_ICONWARNING | MB_TOPMOST | MB_SETFOREGROUND);
     return true;
   }
   size_t host_start = scheme.size();
   size_t path_start = wurl.find(L'/', host_start);
   if (path_start == std::wstring::npos) {
-    MessageBoxW(NULL, L"下载链接格式异常。", L"TypeAnything 更新",
+    MessageBoxW(NULL, L"下载链接格式异常。", L"Chatou 更新",
                 MB_OK | MB_ICONWARNING | MB_TOPMOST | MB_SETFOREGROUND);
     return true;
   }
   std::wstring dl_host = wurl.substr(host_start, path_start - host_start);
   std::wstring dl_path = wurl.substr(path_start);
   std::wstring file_name = dl_path.substr(dl_path.find_last_of(L'/') + 1);
-  if (file_name.empty()) file_name = L"TypeAnything-installer.exe";
+  if (file_name.empty()) file_name = L"Chatou-Installer.exe";
 
   // Download to %TEMP%.
   wchar_t tmp[MAX_PATH] = {0};
@@ -471,7 +471,7 @@ bool check_update_worker() {
   if (!ok) {
     std::wstring err = L"下载失败。可以手动从浏览器打开下载页吗？\n\n"
                        + wurl;
-    if (MessageBoxW(NULL, err.c_str(), L"TypeAnything 更新",
+    if (MessageBoxW(NULL, err.c_str(), L"Chatou 更新",
                     MB_YESNO | MB_ICONWARNING | MB_TOPMOST | MB_SETFOREGROUND) == IDYES) {
       ShellExecuteW(NULL, L"open", wurl.c_str(), NULL, NULL, SW_SHOWNORMAL);
     }
@@ -495,7 +495,7 @@ int WeaselServerApp::Run() {
   if (!m_server.Start())
     return -1;
 
-  // TypeAnything: WinSparkle disabled. Upstream Weasel appcast at
+  // Chatou: WinSparkle disabled. Upstream Weasel appcast at
   // rime.github.io/release/weasel/appcast.xml triggers a startup dialog
   // that confuses users into reinstalling the original Weasel. We use
   // ShellExecute to GitHub Releases for manual update checks instead.
@@ -512,7 +512,7 @@ m_ui.Create(m_server.GetHWnd());
   m_handler->Finalize();
   m_ui.Destroy();
   tray_icon.RemoveIcon();
-  // win_sparkle_cleanup() removed (TypeAnything: WinSparkle disabled)
+  // win_sparkle_cleanup() removed (Chatou: WinSparkle disabled)
 
   return ret;
 }
