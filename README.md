@@ -7,9 +7,14 @@
   [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2563EB?style=flat-square&logo=windows11&logoColor=white)](https://github.com/gjz1023984937-dev/chatou/releases/latest)
   [![Release](https://img.shields.io/github/v/release/gjz1023984937-dev/chatou?style=flat-square&color=7C3AED)](https://github.com/gjz1023984937-dev/chatou/releases/latest)
   [![License](https://img.shields.io/badge/License-MIT-10B981?style=flat-square)](LICENSE)
+
+  **[下载最新版](https://github.com/gjz1023984937-dev/chatou/releases/latest)** · [隐私说明](PRIVACY.md) · [安全说明](SECURITY.md) · [English](README_EN.md)
 </div>
 
 ---
+
+> [!IMPORTANT]
+> 当前发行版仅支持 **Windows 10/11 x64**。Linux、macOS 与 iOS/iPadOS 尚不能直接安装；详见[平台支持](#平台支持)。
 
 ## 你照常打字，Chatou 负责换一种说法
 
@@ -42,6 +47,17 @@ Chatou 不替代你的表达习惯，它只是给输入法多接上一层能力�
 | 在不同软件里反复复制粘贴 | 在当前输入框按 `F8` 完成转换 |
 
 `Enter` 不属于 Chatou。它始终保留给当前软件，用来发送消息或换行。
+
+## 平台支持
+
+| 平台 | 当前状态 | 说明 |
+|---|---|---|
+| Windows 10/11 x64 | ✅ 可用 | 当前 Release 提供安装器，接入 Windows TSF 与 Weasel |
+| Linux | 🧭 计划中 | 需要适配 `fcitx5-rime` 或 `ibus-rime`，Windows 安装包不能直接运行 |
+| macOS | 🧭 计划中 | 需要适配 macOS 输入法前端并重做安装、设置与文本回填 |
+| iOS / iPadOS | 🔬 调研中 | 需要独立键盘扩展；受系统权限限制，交互不会与 Windows 版完全相同 |
+
+Chatou 的提示词、语言与模型调用逻辑可以复用，但当前实现中的 TSF、WinHTTP、注册表、快捷键、剪贴板回填和设置程序均依赖 Windows，因此跨平台不是重新打包即可完成。
 
 ## 它能在哪里工作
 
@@ -110,6 +126,8 @@ Chatou 使用 OpenAI Chat Completions 兼容接口，预设支持：
 Chatou 没有自己的中转服务器。触发转换时，当前待处理文本会直接发送到你配置的模型地址；API Key 和偏好保存在本机 `%APPDATA%\Rime` 下。
 
 如果使用 Ollama 等本地兼容服务，文本可以只在本机模型中处理。具体数据政策仍以你选择的模型服务商为准。
+
+为帮助排查转换问题，当前版本会在本机写入轮转诊断日志，其中可能包含截断后的输入和模型响应；Chatou 不会自动上传这些日志。API Key 也保存在本机配置文件中，并未使用系统凭据保险库加密。请不要在共享 Windows 账户中保存敏感密钥，完整说明和清理方法见 [PRIVACY.md](PRIVACY.md)。
 
 ## 一次按键背后发生了什么
 
@@ -190,10 +208,14 @@ third_party/weasel/                 Windows TSF 输入法框架
 - 可自定义全局触发键
 - 本地模型的一键发现与连接测试
 - 翻译失败时更清晰的非侵入提示
+- 默认隐藏或脱敏本地诊断日志中的输入与模型响应
+- 使用 Windows 凭据保险库保存 API Key
 - Windows 安装包代码签名
-- macOS 与 Linux 输入法适配
+- Linux 输入法适配（优先评估 `fcitx5-rime`）
+- macOS 输入法适配
+- iOS / iPadOS 键盘扩展可行性验证
 
-欢迎提交 Issue 和 Pull Request。与输入框兼容性有关的问题，请附上 Windows 版本、应用名称和复现步骤。
+欢迎提交 Issue 和 Pull Request，参与方式见 [CONTRIBUTING.md](CONTRIBUTING.md)。与输入框兼容性有关的问题，请附上 Windows 版本、应用名称和复现步骤；安全问题请按 [SECURITY.md](SECURITY.md) 私密报告。
 
 ## 来源与许可证
 
