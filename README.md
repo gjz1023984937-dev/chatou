@@ -219,6 +219,6 @@ third_party/weasel/                 Windows TSF 输入法框架
 
 ## 来源与许可证
 
-Chatou 基于 [TypeAnything](https://github.com/A-cat-with-carrots/TypeAnything) 继续开发，并使用 [Weasel](https://github.com/rime/weasel) 与 [librime](https://github.com/rime/librime) 提供 Windows 输入法和 Rime 引擎能力。
+Chatou 使用 [Weasel](https://github.com/rime/weasel) 与 [librime](https://github.com/rime/librime) 提供 Windows 输入法和 Rime 引擎能力。
 
 Chatou 新增代码按 [MIT License](LICENSE) 发布。`third_party/weasel/` 中的上游代码继续遵守其 GPL v3 / BSD-3-Clause 等原始许可证与署名要求。
