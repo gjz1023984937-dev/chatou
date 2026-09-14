@@ -14,7 +14,7 @@
 ---
 
 > [!IMPORTANT]
-> 当前发行版仅支持 **Windows 10/11 x64**。Linux、macOS 与 iOS/iPadOS 尚不能直接安装；详见[平台支持](#平台支持)。
+> 当前发行版仅支持 **Windows 10/11 x64**。Linux、macOS 与 iOS/iPadOS 尚不能直接安装；详细计划见[平台支持](#平台支持)。
 
 ## 你照常打字，Chatou 负责换一种说法
 
