@@ -9,10 +9,13 @@
 // Reads / writes:
 //   %APPDATA%\Rime\typeanything_lang.txt
 //   %APPDATA%\Rime\typeanything.schema.yaml
+//   %APPDATA%\Rime\typeanything_style_history.json
 //
 // JS bridge functions exposed to the page:
 //   nativeReadLang()                            → string
 //   nativeWriteLang(text)                       → void
+//   nativeReadStyleHistory()                    → JSON string
+//   nativeWriteStyleHistory(json)               → bool
 //   nativeReadSchema()                          → {api_key, model, host, path}
 //   nativeWriteSchema(api_key, model, host, path) → void  (+ kicks deployer + server restart)
 //   nativeOpenUrl(url)                          → void
@@ -94,6 +97,9 @@ static fs::path SchemaFilePath()  { return RimeUserDir() / L"typeanything.schema
 // vendor's field. schema.yaml still holds the *active* provider's key for
 // the runtime; this is just a UI memory.
 static fs::path KeyringFilePath() { return RimeUserDir() / L"typeanything.keyring.json"; }
+static fs::path StyleHistoryFilePath() {
+  return RimeUserDir() / L"typeanything_style_history.json";
+}
 static fs::path PromptsFilePath() { return RimeUserDir() / L"typeanything_prompts.txt"; }
 static fs::path ClassifyLogPath() { return RimeUserDir() / L"typeanything_classify.log"; }
 
@@ -897,6 +903,20 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
     if (parts.empty()) return "false";
     bool ok = WriteAllUtf8(LangFilePath(), parts[0]);
     return ok ? "true" : "false";
+  });
+
+  // Recent styles are deliberately kept as a small UI-owned JSON array.
+  // Native code only provides durable local storage; the web UI validates,
+  // deduplicates and caps the entries before writing.
+  w.bind("nativeReadStyleHistory", [](const std::string& /*args*/) -> std::string {
+    std::string raw = ReadAllUtf8(StyleHistoryFilePath());
+    if (raw.empty()) raw = "[]";
+    return "\"" + JsonEscape(raw) + "\"";
+  });
+  w.bind("nativeWriteStyleHistory", [](const std::string& args) -> std::string {
+    auto parts = ParseJsonStringArray(args);
+    if (parts.empty()) return "false";
+    return WriteAllUtf8(StyleHistoryFilePath(), parts[0]) ? "true" : "false";
   });
 
   w.bind("nativeReadSchema", [](const std::string& /*args*/) -> std::string {

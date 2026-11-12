@@ -112,6 +112,90 @@ function toast(msg, kind = "ok", opts = {}) {
 async function initLangPage() {
   const input = document.getElementById("langInput");
   const saveBtn = document.getElementById("langSave");
+  const recentSection = document.getElementById("recentSection");
+  const recentChips = document.getElementById("recentChips");
+  const recentEmpty = document.getElementById("recentEmpty");
+  const clearRecent = document.getElementById("clearRecent");
+  const HISTORY_LIMIT = 8;
+  let styleHistory = [];
+
+  function normalizeHistory(raw) {
+    if (!Array.isArray(raw)) return [];
+    const seen = new Set();
+    const clean = [];
+    for (const item of raw) {
+      const label = String(item && item.label || "").trim();
+      const category = String(item && item.category || "").toUpperCase();
+      if (!label || !"ABCD".includes(category) || seen.has(label.toLowerCase())) continue;
+      seen.add(label.toLowerCase());
+      clean.push({ label, category, source: item.source === "preset" ? "preset" : "custom" });
+      if (clean.length >= HISTORY_LIMIT) break;
+    }
+    return clean;
+  }
+
+  async function persistHistory() {
+    const ok = await window.nativeWriteStyleHistory(JSON.stringify(styleHistory));
+    if (!ok) throw new Error("无法写入最近使用记录");
+  }
+
+  async function writeLang(value) {
+    const ok = await window.nativeWriteLang(value);
+    if (!ok) throw new Error("无法写入风格设置");
+  }
+
+  function selectStyle(label, category, chip) {
+    input.value = label;
+    input.dataset.category = category;
+    input.focus();
+    input.setSelectionRange(label.length, label.length);
+    document.querySelectorAll(".chip.active").forEach(x => x.classList.remove("active"));
+    if (chip) chip.classList.add("active");
+  }
+
+  function renderHistory() {
+    recentChips.textContent = "";
+    recentSection.hidden = false;
+    recentEmpty.hidden = styleHistory.length > 0;
+    recentChips.hidden = styleHistory.length === 0;
+    for (const item of styleHistory) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip recent-chip";
+      chip.textContent = item.label;
+      chip.dataset.category = item.category;
+      chip.addEventListener("click", () => selectStyle(item.label, item.category, chip));
+      recentChips.appendChild(chip);
+    }
+  }
+
+  async function rememberStyle(label, category, source) {
+    const key = label.toLowerCase();
+    styleHistory = styleHistory.filter(x => x.label.toLowerCase() !== key);
+    styleHistory.unshift({ label, category, source });
+    styleHistory = styleHistory.slice(0, HISTORY_LIMIT);
+    renderHistory();
+    await persistHistory();
+  }
+
+  try {
+    const raw = await window.nativeReadStyleHistory();
+    styleHistory = normalizeHistory(JSON.parse(raw || "[]"));
+  } catch (_) {
+    styleHistory = [];
+  }
+  renderHistory();
+
+  clearRecent.addEventListener("click", async () => {
+    styleHistory = [];
+    renderHistory();
+    try {
+      await persistHistory();
+      toast("已清空最近使用", "ok");
+    } catch (e) {
+      toast("清空失败：" + (e && e.message || e), "error");
+    }
+  });
 
   // Pre-fill only if user has a non-default custom value. The install
   // script seeds "en" (legacy 2-letter code that maps to English), and
@@ -180,12 +264,12 @@ async function initLangPage() {
         if (cur && cur !== "无") lastLang = cur;
         input.value = "无";  // 无 — friendly display
         applyPureLock(true);
-        try { await window.nativeWriteLang("off"); } catch (e) {}
+        try { await writeLang("off"); } catch (e) {}
       } else {
         const restore = lastLang || input.placeholder || "English";
         input.value = restore;
         applyPureLock(false);
-        try { await window.nativeWriteLang(restore); } catch (e) {}
+        try { await writeLang(restore); } catch (e) {}
       }
     });
   }
@@ -200,20 +284,25 @@ async function initLangPage() {
     return chip.dataset.category ||
            (chip.closest(".chips") || {}).dataset?.category || "";
   }
+  function knownCategory(label) {
+    const wanted = String(label || "").trim().toLowerCase();
+    let category = "";
+    document.querySelectorAll(".style-grid .chip, #recentChips .chip").forEach(c => {
+      const value = (c.dataset.value || c.textContent || "").trim().toLowerCase();
+      if (!category && value === wanted) category = chipCategory(c);
+    });
+    return category;
+  }
   function clearChipActive() {
     document.querySelectorAll(".chip.active").forEach(x => x.classList.remove("active"));
     delete input.dataset.category;
   }
   document.querySelectorAll(".chip").forEach(c => {
+    if (c.classList.contains("recent-chip")) return;
     c.addEventListener("click", () => {
-      input.value = c.dataset.value || c.textContent;
-      input.focus();
-      const n = input.value.length;
-      input.setSelectionRange(n, n);
       clearChipActive();
-      c.classList.add("active");
       const cat = chipCategory(c);
-      if (cat) input.dataset.category = cat;
+      selectStyle(c.dataset.value || c.textContent, cat, c);
     });
   });
   // Any manual edit invalidates the chip "selected" state — including the
@@ -250,7 +339,7 @@ async function initLangPage() {
       // Pure mode ("off") skips classification — write the bare sentinel so
       // the plugin's codepage-safe compare still matches.
       if (v.toLowerCase() === "off") {
-        await window.nativeWriteLang("off");
+        await writeLang("off");
         toast("已保存", "ok");
         return;
       }
@@ -258,9 +347,15 @@ async function initLangPage() {
       // came from a preset chip click (cleared on any manual edit). Use
       // that letter directly and skip the LLM call so users without an
       // API key can still save preset styles.
-      const presetCat = input.dataset.category;
+      // Exact matches typed by hand (for example "English") inherit the
+      // category already declared by the built-in/history chip. They should
+      // not make an unnecessary classifier request.
+      const presetCat = input.dataset.category || knownCategory(v);
       if (presetCat && "ABCD".includes(presetCat)) {
-        await window.nativeWriteLang(presetCat + ":" + v);
+        await writeLang(presetCat + ":" + v);
+        const isPreset = Array.from(document.querySelectorAll(".style-grid .chip"))
+          .some(c => (c.dataset.value || c.textContent || "").trim() === v);
+        await rememberStyle(v, presetCat, isPreset ? "preset" : "custom");
         toast("已保存", "ok");
         return;
       }
@@ -288,7 +383,8 @@ async function initLangPage() {
         toast("保存失败：分类返回非法值 " + cat, "error");
         return;
       }
-      await window.nativeWriteLang(cat + ":" + v);
+      await writeLang(cat + ":" + v);
+      await rememberStyle(v, cat, "custom");
       toast("已保存", "ok");
       // Stay open — user may want to make more changes. They close with X.
     } catch (e) {
