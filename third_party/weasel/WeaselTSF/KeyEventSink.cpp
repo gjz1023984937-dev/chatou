@@ -12,6 +12,7 @@ namespace {
 bool IsChatouUndoKey(WPARAM wParam) {
   return (wParam == 'Z') &&
          ((GetKeyState(VK_CONTROL) & 0x8000) != 0) &&
+         ((GetKeyState(VK_SHIFT) & 0x8000) == 0) &&
          ((GetKeyState(VK_MENU) & 0x8000) == 0);
 }
 
