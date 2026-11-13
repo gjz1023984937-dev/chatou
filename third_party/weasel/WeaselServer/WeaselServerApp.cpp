@@ -33,7 +33,7 @@ WeaselServerApp::~WeaselServerApp() {}
 // registry read fails (e.g. running from a dev build that never went
 // through the installer).
 #ifndef TA_VERSION
-#define TA_VERSION L"v0.8.8"
+#define TA_VERSION L"v0.8.9"
 #endif
 
 namespace {
