@@ -17,12 +17,16 @@ struct ResponseParser {
   Status* p_status;
   Config* p_config;
   UIStyle* p_style;
+  std::wstring* p_chatou_original;
+  std::wstring* p_chatou_replacement;
 
   ResponseParser(std::wstring* commit,
                  Context* context = 0,
                  Status* status = 0,
                  Config* config = 0,
-                 UIStyle* style = 0);
+                 UIStyle* style = 0,
+                 std::wstring* chatou_original = 0,
+                 std::wstring* chatou_replacement = 0);
 
   // 重載函數調用運算符, 以扮做ResponseHandler
   bool operator()(LPWSTR buffer, UINT length);

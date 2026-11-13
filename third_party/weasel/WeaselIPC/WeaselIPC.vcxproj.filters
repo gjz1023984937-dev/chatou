@@ -39,6 +39,9 @@
     <ClCompile Include="Committer.cpp">
       <Filter>Source Files\Deserializer</Filter>
     </ClCompile>
+    <ClCompile Include="ChatouReplacer.cpp">
+      <Filter>Source Files\Deserializer</Filter>
+    </ClCompile>
     <ClCompile Include="ContextUpdater.cpp">
       <Filter>Source Files\Deserializer</Filter>
     </ClCompile>
@@ -75,6 +78,9 @@
       <Filter>Header Files\Deserializer</Filter>
     </ClInclude>
     <ClInclude Include="Committer.h">
+      <Filter>Header Files\Deserializer</Filter>
+    </ClInclude>
+    <ClInclude Include="ChatouReplacer.h">
       <Filter>Header Files\Deserializer</Filter>
     </ClInclude>
     <ClInclude Include="ContextUpdater.h">

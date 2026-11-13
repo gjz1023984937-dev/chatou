@@ -743,6 +743,36 @@ bool RimeWithWeaselHandler::_Respond(WeaselSessionId ipc_id, EatLine eat) {
 
   SessionStatus& session_status = get_session_status(ipc_id);
   RimeSessionId session_id = session_status.session_id;
+
+  std::array<char, WEASEL_IPC_BUFFER_SIZE> chatou_ready = {};
+  if (rime_api->get_property(session_id, "chatou_replace_ready",
+                             chatou_ready.data(), chatou_ready.size()) &&
+      std::strcmp(chatou_ready.data(), "1") == 0) {
+    std::array<char, WEASEL_IPC_BUFFER_SIZE> original = {};
+    std::array<char, WEASEL_IPC_BUFFER_SIZE> replacement = {};
+    bool has_original = rime_api->get_property(
+        session_id, "chatou_replace_original", original.data(), original.size());
+    bool has_replacement = rime_api->get_property(
+        session_id, "chatou_replace_result", replacement.data(),
+        replacement.size());
+
+    // Consume the signal even when malformed so a stale request is never
+    // replayed on a later key event.
+    rime_api->set_property(session_id, "chatou_replace_ready", "");
+    rime_api->set_property(session_id, "chatou_replace_original", "");
+    rime_api->set_property(session_id, "chatou_replace_result", "");
+
+    if (has_original && has_replacement && original[0] && replacement[0]) {
+      actions.push_back("chatou");
+      body.append(L"chatou.original=")
+          .append(escape_string(u8tow(original.data())))
+          .append(L"\n")
+          .append(L"chatou.replacement=")
+          .append(escape_string(u8tow(replacement.data())))
+          .append(L"\n");
+    }
+  }
+
   RIME_STRUCT(RimeCommit, commit);
   if (rime_api->get_commit(session_id, &commit)) {
     actions.push_back("commit");

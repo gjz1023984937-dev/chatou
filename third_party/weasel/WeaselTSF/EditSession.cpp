@@ -26,19 +26,28 @@ bool ParseChatouReplaceCommand(const std::wstring& commit,
 STDAPI WeaselTSF::DoEditSession(TfEditCookie ec) {
   // get commit string from server
   std::wstring commit;
+  std::wstring chatouOriginal;
+  std::wstring chatouReplacement;
   weasel::Config config;
   auto context = std::make_shared<weasel::Context>();
   weasel::ResponseParser parser(&commit, context.get(), &_status, &config,
-                                &_cand->style());
+                                &_cand->style(), &chatouOriginal,
+                                &chatouReplacement);
 
   bool ok = m_client.GetResponseData(std::ref(parser));
 
   _UpdateLanguageBar(_status);
 
   if (ok) {
+    if (!chatouOriginal.empty() && !chatouReplacement.empty()) {
+      _committed = _ApplyChatouReplacement(
+          ec, _pEditSessionContext, chatouOriginal, chatouReplacement, TRUE);
+      _UpdateUI(*context, _status);
+      return TRUE;
+    }
     if (!commit.empty()) {
-      std::wstring chatouOriginal;
-      std::wstring chatouReplacement;
+      // Compatibility fallback for an in-place upgrade from v0.8.7. New
+      // servers never put Chatou control data in committed text.
       if (ParseChatouReplaceCommand(commit, &chatouOriginal,
                                     &chatouReplacement)) {
         _committed = _ApplyChatouReplacement(

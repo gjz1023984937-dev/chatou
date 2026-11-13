@@ -9,12 +9,16 @@ ResponseParser::ResponseParser(std::wstring* commit,
                                Context* context,
                                Status* status,
                                Config* config,
-                               UIStyle* style)
+                               UIStyle* style,
+                               std::wstring* chatou_original,
+                               std::wstring* chatou_replacement)
     : p_commit(commit),
       p_context(context),
       p_status(status),
       p_config(config),
-      p_style(style) {
+      p_style(style),
+      p_chatou_original(chatou_original),
+      p_chatou_replacement(chatou_replacement) {
   Deserializer::Initialize(this);
 }
 

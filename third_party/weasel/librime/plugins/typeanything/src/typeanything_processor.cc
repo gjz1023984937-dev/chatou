@@ -4,8 +4,9 @@
 //   * commit_notifier hook accumulates Chinese commits.
 //   * On F8 (no active composition, accumulated non-empty):
 //       1. spawn worker thread to call LLM (Chinese stays visible in app)
-//       2. when LLM returns, wake the TSF client through an internal F24 event
-//       3. TSF verifies the original text at the caret and replaces it atomically
+//       2. when LLM returns, publish the result as Rime context properties
+//       3. wake TSF with F24; Weasel carries the properties over a dedicated IPC
+//          action and TSF replaces the checked range atomically
 //       4. if the user typed or changed focus after step 1, drop the result
 
 #include "typeanything_processor.h"
@@ -51,6 +52,8 @@ struct TypeAnythingProcessor::AsyncState {
   std::uintptr_t pending_window = 0;
   std::string pending_original;
   std::string pending_result;
+  std::string last_replaced_original;
+  std::string retranslate_once;
 };
 
 // Languages supported. Tray "Switch Language" submenu writes the chosen code
@@ -351,17 +354,6 @@ inline void TranslateLog(TranslateLogRec rec) {
   }).detach();
 }
 
-// Private-use delimiters keep this internal command out of normal user text.
-// It travels through the existing Rime commit IPC and is consumed by the TSF
-// client, which performs one checked range replacement in an edit session.
-std::string BuildTsfReplaceCommand(const std::string& original,
-                                   const std::string& replacement) {
-  static const char kPrefix[] =
-      "\xEE\x80\x80" "CHATOU_REPLACE_V1\xEE\x80\x81";  // U+E000 ... U+E001
-  static const char kSeparator[] = "\xEE\x80\x82";   // U+E002
-  return std::string(kPrefix) + original + kSeparator + replacement;
-}
-
 bool WakeTsfClient() {
   INPUT inputs[2] = {};
   inputs[0].type = INPUT_KEYBOARD;
@@ -543,9 +535,9 @@ rime::ProcessResult TypeAnythingProcessor::ProcessKeyEvent(
     const rime::KeyEvent& key_event) {
   if (key_event.release()) return rime::kNoop;
 
-  // F24 is an internal wake-up sent by the completed HTTP worker. It brings
-  // the result back through Rime's normal commit response so the TSF client
-  // can apply an atomic, checked replacement instead of SendInput/backspace.
+  // F24 is an internal wake-up sent by the completed HTTP worker. The result
+  // is exposed as context properties and transported by a dedicated Weasel
+  // IPC action. It must never pass through the normal committed-text channel.
   if (key_event.keycode() == XK_F24) {
     std::string original;
     std::string result;
@@ -565,9 +557,37 @@ rime::ProcessResult TypeAnythingProcessor::ProcessKeyEvent(
       async_state_->pending_ready = false;
     }
     if (ready && engine_) {
-      engine_->CommitText(BuildTsfReplaceCommand(original, result));
+      rime::Context* ctx = engine_->context();
+      if (ctx) {
+        ctx->set_property("chatou_replace_original", original);
+        ctx->set_property("chatou_replace_result", result);
+        // Publish the ready flag last so the server never observes a partial
+        // replacement pair.
+        ctx->set_property("chatou_replace_ready", "1");
+        std::lock_guard<std::mutex> lk(async_state_->pending_mu);
+        async_state_->last_replaced_original = original;
+      }
     }
     return rime::kAccepted;
+  }
+
+  // F23 is an internal notification sent only after TSF has successfully
+  // restored the previous source text for Ctrl+Z. Preserve it for exactly one
+  // immediate F8. Any intervening user key cancels it below.
+  if (key_event.keycode() == XK_F23) {
+    std::lock_guard<std::mutex> lk(async_state_->pending_mu);
+    async_state_->retranslate_once = async_state_->last_replaced_original;
+    return rime::kAccepted;
+  }
+
+  std::string retranslate_once;
+  {
+    std::lock_guard<std::mutex> lk(async_state_->pending_mu);
+    if (key_event.keycode() == XK_F8) {
+      retranslate_once = std::move(async_state_->retranslate_once);
+    } else {
+      async_state_->retranslate_once.clear();
+    }
   }
 
   // Any real user key after dispatch makes an in-flight result stale. This
@@ -610,7 +630,7 @@ rime::ProcessResult TypeAnythingProcessor::ProcessKeyEvent(
   }
 
   if (key_event.keycode() != XK_F8) return rime::kNoop;
-  if (accumulated_.empty()) return rime::kNoop;
+  if (accumulated_.empty() && retranslate_once.empty()) return rime::kNoop;
 
   rime::Context* ctx = engine_->context();
   if (ctx && ctx->IsComposing()) return rime::kNoop;
@@ -621,7 +641,7 @@ rime::ProcessResult TypeAnythingProcessor::ProcessKeyEvent(
   if (api_key_.empty()) {
     TranslateLogRec rec;
     rec.target_lang = ResolveTargetLang();
-    rec.input_text  = accumulated_;
+    rec.input_text  = retranslate_once.empty() ? accumulated_ : retranslate_once;
     rec.host        = endpoint_;
     rec.path        = endpoint_path_;
     rec.model       = model_;
@@ -644,7 +664,9 @@ rime::ProcessResult TypeAnythingProcessor::ProcessKeyEvent(
     }
   }
 
-  std::string chinese = std::move(accumulated_);
+  std::string chinese = retranslate_once.empty()
+                            ? std::move(accumulated_)
+                            : std::move(retranslate_once);
   accumulated_.clear();
   DispatchTranslate(chinese);
   return rime::kAccepted;
