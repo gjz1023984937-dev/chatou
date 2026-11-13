@@ -153,6 +153,7 @@ class WeaselTSF : public ITfTextInputProcessorEx,
                         bool* const scroll_next);
 
  private:
+  friend class CChatouUndoEditSession;
   /* ui callback functions private */
   void _SelectCandidateOnCurrentPage(const size_t index);
   void _HandleMouseHoverEvent(const size_t index);
@@ -181,6 +182,13 @@ class WeaselTSF : public ITfTextInputProcessorEx,
   void _EnableLanguageBar(BOOL enable);
 
   BOOL _InsertText(com_ptr<ITfContext> pContext, const std::wstring& ext);
+  BOOL _ApplyChatouReplacement(TfEditCookie ec,
+                               com_ptr<ITfContext> pContext,
+                               const std::wstring& expected,
+                               const std::wstring& replacement,
+                               BOOL recordUndo);
+  BOOL _UndoChatouReplacement(com_ptr<ITfContext> pContext);
+  void _InvalidateChatouUndo();
 
   void _DeleteCandidateList();
 
@@ -233,4 +241,11 @@ class WeaselTSF : public ITfTextInputProcessorEx,
   BOOL _async_edit = false;
   BOOL _committed = false;
   BOOL _isToOpenClose = false;
+
+  // One guarded undo transaction for the most recent AI replacement. The
+  // range is revalidated against the current TSF selection before restoring.
+  com_ptr<ITfContext> _chatouUndoContext;
+  std::wstring _chatouUndoOriginal;
+  std::wstring _chatouUndoResult;
+  BOOL _chatouUndoValid = false;
 };

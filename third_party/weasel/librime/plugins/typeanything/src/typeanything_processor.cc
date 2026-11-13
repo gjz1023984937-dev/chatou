@@ -4,9 +4,9 @@
 //   * commit_notifier hook accumulates Chinese commits.
 //   * On F8 (no active composition, accumulated non-empty):
 //       1. spawn worker thread to call LLM (Chinese stays visible in app)
-//       2. when LLM returns, delete the original Chinese chars and paste
-//          translation via clipboard + Ctrl+V
-//       3. version-check: if user typed something else after step 1, drop result
+//       2. when LLM returns, wake the TSF client through an internal F24 event
+//       3. TSF verifies the original text at the caret and replaces it atomically
+//       4. if the user typed or changed focus after step 1, drop the result
 
 #include "typeanything_processor.h"
 
@@ -34,8 +34,24 @@
 #include <mutex>
 #include <ctime>
 #include <filesystem>
+#include <memory>
+#include <cstdint>
 
 namespace typeanything {
+
+struct TypeAnythingProcessor::AsyncState {
+  std::atomic<bool> alive{true};
+  std::atomic<uint64_t> request_id{0};
+  std::atomic<uint64_t> activity_id{0};
+
+  std::mutex pending_mu;
+  bool pending_ready = false;
+  uint64_t pending_request_id = 0;
+  uint64_t pending_activity_id = 0;
+  std::uintptr_t pending_window = 0;
+  std::string pending_original;
+  std::string pending_result;
+};
 
 // Languages supported. Tray "Switch Language" submenu writes the chosen code
 // to %APPDATA%\Rime\typeanything_lang.txt; plugin reads it on each F8.
@@ -335,64 +351,25 @@ inline void TranslateLog(TranslateLogRec rec) {
   }).detach();
 }
 
-size_t Utf8CodePointCount(const std::string& s) {
-  size_t count = 0;
-  for (size_t i = 0; i < s.size(); ) {
-    unsigned char c = (unsigned char)s[i];
-    if (c < 0x80) i += 1;
-    else if ((c & 0xE0) == 0xC0) i += 2;
-    else if ((c & 0xF0) == 0xE0) i += 3;
-    else if ((c & 0xF8) == 0xF0) i += 4;
-    else i += 1;
-    ++count;
-  }
-  return count;
+// Private-use delimiters keep this internal command out of normal user text.
+// It travels through the existing Rime commit IPC and is consumed by the TSF
+// client, which performs one checked range replacement in an edit session.
+std::string BuildTsfReplaceCommand(const std::string& original,
+                                   const std::string& replacement) {
+  static const char kPrefix[] =
+      "\xEE\x80\x80CHATOU_REPLACE_V1\xEE\x80\x81";  // U+E000 ... U+E001
+  static const char kSeparator[] = "\xEE\x80\x82";   // U+E002
+  return std::string(kPrefix) + original + kSeparator + replacement;
 }
 
-bool SendBackspaces(int count) {
-  if (count <= 0) return true;
-  std::vector<INPUT> inputs(count * 2);
-  for (int i = 0; i < count; ++i) {
-    inputs[i * 2].type = INPUT_KEYBOARD;
-    inputs[i * 2].ki.wVk = VK_BACK;
-    inputs[i * 2 + 1].type = INPUT_KEYBOARD;
-    inputs[i * 2 + 1].ki.wVk = VK_BACK;
-    inputs[i * 2 + 1].ki.dwFlags = KEYEVENTF_KEYUP;
-  }
-  return SendInput((UINT)inputs.size(), inputs.data(), sizeof(INPUT)) ==
-         inputs.size();
-}
-
-bool SetClipboardUtf8(const std::string& utf8) {
-  std::wstring w = Utf8ToWide(utf8);
-  // Retry — clipboard may briefly be locked.
-  for (int attempt = 0; attempt < 5; ++attempt) {
-    if (OpenClipboard(nullptr)) {
-      bool success = false;
-      EmptyClipboard();
-      size_t bytes = (w.size() + 1) * sizeof(wchar_t);
-      HGLOBAL h = GlobalAlloc(GMEM_MOVEABLE, bytes);
-      if (h) {
-        void* p = GlobalLock(h);
-        if (p) {
-          memcpy(p, w.c_str(), bytes);
-          GlobalUnlock(h);
-          // On success the system owns h; only free it if we keep ownership.
-          if (!SetClipboardData(CF_UNICODETEXT, h)) {
-            GlobalFree(h);
-          } else {
-            success = true;
-          }
-        } else {
-          GlobalFree(h);  // GlobalLock failed — h is still ours
-        }
-      }
-      CloseClipboard();
-      if (success) return true;
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
-  }
-  return false;
+bool WakeTsfClient() {
+  INPUT inputs[2] = {};
+  inputs[0].type = INPUT_KEYBOARD;
+  inputs[0].ki.wVk = VK_F24;
+  inputs[1].type = INPUT_KEYBOARD;
+  inputs[1].ki.wVk = VK_F24;
+  inputs[1].ki.dwFlags = KEYEVENTF_KEYUP;
+  return SendInput(2, inputs, sizeof(INPUT)) == 2;
 }
 
 // Launch <WeaselRoot>\ta-settings.exe --page model so the user can fill the
@@ -414,25 +391,10 @@ bool LaunchTaSettingsModelPage() {
   return (INT_PTR)h > 32;
 }
 
-bool SendPaste() {
-  INPUT in[4] = {};
-  in[0].type = INPUT_KEYBOARD;
-  in[0].ki.wVk = VK_CONTROL;
-  in[1].type = INPUT_KEYBOARD;
-  in[1].ki.wVk = 'V';
-  in[2].type = INPUT_KEYBOARD;
-  in[2].ki.wVk = 'V';
-  in[2].ki.dwFlags = KEYEVENTF_KEYUP;
-  in[3].type = INPUT_KEYBOARD;
-  in[3].ki.wVk = VK_CONTROL;
-  in[3].ki.dwFlags = KEYEVENTF_KEYUP;
-  return SendInput(4, in, sizeof(INPUT)) == 4;
-}
-
 }  // namespace
 
 TypeAnythingProcessor::TypeAnythingProcessor(const rime::Ticket& ticket)
-    : rime::Processor(ticket) {
+    : rime::Processor(ticket), async_state_(std::make_shared<AsyncState>()) {
   LoadConfig();
   if (engine_) {
     auto* ctx = engine_->context();
@@ -444,6 +406,8 @@ TypeAnythingProcessor::TypeAnythingProcessor(const rime::Ticket& ticket)
 }
 
 TypeAnythingProcessor::~TypeAnythingProcessor() {
+  async_state_->alive.store(false);
+  async_state_->request_id.fetch_add(1);
   if (commit_conn_.connected()) {
     commit_conn_.disconnect();
   }
@@ -568,15 +532,47 @@ std::string TypeAnythingProcessor::ResolveTargetLang() const {
 }
 
 void TypeAnythingProcessor::OnCommit(rime::Context* ctx) {
-  if (suppress_capture_.load() || !ctx) return;
+  if (!ctx) return;
   std::string text = ctx->GetCommitText();
   if (text.empty()) return;
+  async_state_->activity_id.fetch_add(1);
   accumulated_ += text;
 }
 
 rime::ProcessResult TypeAnythingProcessor::ProcessKeyEvent(
     const rime::KeyEvent& key_event) {
   if (key_event.release()) return rime::kNoop;
+
+  // F24 is an internal wake-up sent by the completed HTTP worker. It brings
+  // the result back through Rime's normal commit response so the TSF client
+  // can apply an atomic, checked replacement instead of SendInput/backspace.
+  if (key_event.keycode() == XK_F24) {
+    std::string original;
+    std::string result;
+    bool ready = false;
+    {
+      std::lock_guard<std::mutex> lk(async_state_->pending_mu);
+      ready = async_state_->pending_ready &&
+              async_state_->alive.load() &&
+              async_state_->pending_request_id == async_state_->request_id.load() &&
+              async_state_->pending_activity_id == async_state_->activity_id.load() &&
+              async_state_->pending_window ==
+                  reinterpret_cast<std::uintptr_t>(GetForegroundWindow());
+      if (ready) {
+        original = std::move(async_state_->pending_original);
+        result = std::move(async_state_->pending_result);
+      }
+      async_state_->pending_ready = false;
+    }
+    if (ready && engine_) {
+      engine_->CommitText(BuildTsfReplaceCommand(original, result));
+    }
+    return rime::kAccepted;
+  }
+
+  // Any real user key after dispatch makes an in-flight result stale. This
+  // includes pinyin keys before they become a committed Rime candidate.
+  async_state_->activity_id.fetch_add(1);
 
   // BackSpace outside composition: user deleting committed Chinese.
   // Pop the last UTF-8 character from accumulated_ so we don't translate
@@ -655,8 +651,11 @@ rime::ProcessResult TypeAnythingProcessor::ProcessKeyEvent(
 }
 
 void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
-  uint64_t this_id = request_id_.fetch_add(1) + 1;
-  size_t chinese_chars = Utf8CodePointCount(chinese);
+  auto state = async_state_;
+  uint64_t this_id = state->request_id.fetch_add(1) + 1;
+  uint64_t activity_at_dispatch = state->activity_id.load();
+  std::uintptr_t request_window =
+      reinterpret_cast<std::uintptr_t>(GetForegroundWindow());
   std::string raw_lang = ResolveTargetLang();
   // No-translate mode: skip LLM call when the lang picker selects "off".
   if (raw_lang == "none" || raw_lang == "None" || raw_lang == "no-translate" ||
@@ -690,13 +689,11 @@ void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
   std::string path = endpoint_path_;
   double temp = temperature_;
 
-  // No placeholder — keep Chinese visible until translation arrives.
-  suppress_capture_.store(true);
-
-  // Spawn worker thread for LLM call. When it returns, delete the original
-  // Chinese chars and paste the translation.
-  std::thread([this, this_id, chinese, chinese_chars, lang, system_prompt,
-               api_key, model, endpoint, path, temp, category]() {
+  // Spawn a worker without retaining `this`. The result is queued in shared
+  // state and later consumed on Rime's input thread via the synthetic F24.
+  std::thread([state, this_id, activity_at_dispatch, request_window, chinese,
+               lang, system_prompt, api_key, model, endpoint, path, temp,
+               category]() {
     // Logging bundle — populated as we progress; dispatched on every exit
     // path via TranslateLog() (which is itself a detached thread, so no
     // disk I/O blocks the IME hot path).
@@ -745,8 +742,10 @@ void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
     log_rec.response    = body;
 
     // If user dispatched another translation since we started, abort.
-    if (this_id != request_id_.load()) {
-      suppress_capture_.store(false);
+    if (!state->alive.load() || this_id != state->request_id.load() ||
+        activity_at_dispatch != state->activity_id.load() ||
+        request_window !=
+            reinterpret_cast<std::uintptr_t>(GetForegroundWindow())) {
       log_rec.result = "superseded";
       TranslateLog(std::move(log_rec));
       return;
@@ -756,7 +755,6 @@ void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
     // panel so the user can correct it; do not paste anything.
     if (http_status == 401 || http_status == 403) {
       bool launched = LaunchTaSettingsModelPage();
-      suppress_capture_.store(false);
       log_rec.result = launched
           ? "auth_failed;ta_settings_launched"
           : "auth_failed;ta_settings_launch_failed";
@@ -777,23 +775,33 @@ void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
       // so user knows translation didn't run; log for diagnostics.
       LOG(ERROR) << "TypeAnything: LLM returned empty for input: " << chinese
                  << "; raw body bytes: " << body.size();
-      suppress_capture_.store(false);
       log_rec.result = "empty-response";
       TranslateLog(std::move(log_rec));
       return;
     }
 
-    bool send_ok = false;
-    if (SetClipboardUtf8(english)) {
-      bool deleted = SendBackspaces((int)chinese_chars);
-      std::this_thread::sleep_for(std::chrono::milliseconds(80));
-      bool pasted = SendPaste();
-      send_ok = deleted && pasted;
+    {
+      std::lock_guard<std::mutex> lk(state->pending_mu);
+      if (!state->alive.load() || this_id != state->request_id.load() ||
+          activity_at_dispatch != state->activity_id.load()) {
+        log_rec.result = "superseded-before-tsf-dispatch";
+        TranslateLog(std::move(log_rec));
+        return;
+      }
+      state->pending_request_id = this_id;
+      state->pending_activity_id = activity_at_dispatch;
+      state->pending_window = request_window;
+      state->pending_original = chinese;
+      state->pending_result = english;
+      state->pending_ready = true;
     }
+    bool send_ok = WakeTsfClient();
     log_rec.send_input_ok = send_ok;
-    log_rec.result = send_ok ? "ok" : "clipboard-or-input-injection-fail";
-    std::this_thread::sleep_for(std::chrono::milliseconds(150));
-    suppress_capture_.store(false);
+    log_rec.result = send_ok ? "queued-tsf-replace" : "tsf-wakeup-fail";
+    if (!send_ok) {
+      std::lock_guard<std::mutex> lk(state->pending_mu);
+      if (state->pending_request_id == this_id) state->pending_ready = false;
+    }
     TranslateLog(std::move(log_rec));
   }).detach();
 }

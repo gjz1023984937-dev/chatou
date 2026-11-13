@@ -1,5 +1,5 @@
-// TypeAnything processor — captures committed Chinese, on F8 calls LLM,
-// replaces accumulated Chinese in the app textbox with translation.
+// TypeAnything processor — captures committed Chinese, calls the LLM on F8,
+// and returns a guarded replacement command to the Weasel TSF client.
 
 #ifndef TYPEANYTHING_PROCESSOR_H_
 #define TYPEANYTHING_PROCESSOR_H_
@@ -9,6 +9,7 @@
 #include <rime/common.h>
 #include <boost/signals2/connection.hpp>
 #include <atomic>
+#include <memory>
 #include <string>
 
 namespace rime {
@@ -28,8 +29,7 @@ class TypeAnythingProcessor : public rime::Processor {
   void LoadConfig();
   std::string ResolveTargetLang() const;
   void OnCommit(rime::Context* ctx);
-  // Async dispatch — spawns worker thread, returns immediately after
-  // putting placeholder in app.
+  // Async dispatch — spawns a worker and leaves the original text visible.
   void DispatchTranslate(const std::string& chinese);
 
   std::string api_key_;
@@ -40,10 +40,12 @@ class TypeAnythingProcessor : public rime::Processor {
   double temperature_ = 0.3;
 
   std::string accumulated_;
-  std::atomic<bool> suppress_capture_{false};
-  // Versioning: each translation request gets an id; when the worker
-  // completes we only apply if request_id_ == id at end.
-  std::atomic<uint64_t> request_id_{0};
+
+  // Detached HTTP workers never retain the processor itself. The shared
+  // state outlives the processor just long enough for a worker to observe
+  // cancellation and exit safely.
+  struct AsyncState;
+  std::shared_ptr<AsyncState> async_state_;
 
   boost::signals2::connection commit_conn_;
 };

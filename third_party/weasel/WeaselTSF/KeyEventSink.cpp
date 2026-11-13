@@ -8,6 +8,22 @@ static weasel::KeyEvent prevKeyEvent;
 static BOOL prevfEaten = FALSE;
 static int keyCountToSimulate = 0;
 
+namespace {
+bool IsChatouUndoKey(WPARAM wParam) {
+  return (wParam == 'Z') &&
+         ((GetKeyState(VK_CONTROL) & 0x8000) != 0) &&
+         ((GetKeyState(VK_SHIFT) & 0x8000) == 0) &&
+         ((GetKeyState(VK_MENU) & 0x8000) == 0);
+}
+
+bool IsModifierKey(WPARAM wParam) {
+  return wParam == VK_CONTROL || wParam == VK_LCONTROL ||
+         wParam == VK_RCONTROL || wParam == VK_SHIFT ||
+         wParam == VK_LSHIFT || wParam == VK_RSHIFT ||
+         wParam == VK_MENU || wParam == VK_LMENU || wParam == VK_RMENU;
+}
+}  // namespace
+
 void WeaselTSF::_ProcessKeyEvent(WPARAM wParam, LPARAM lParam, BOOL* pfEaten) {
   // when _IsKeyboardDisabled don't eat the key,
   // when keyboard closable and keyboard closed, don't eat the key
@@ -66,6 +82,7 @@ STDAPI WeaselTSF::OnSetFocus(BOOL fForeground) {
   if (fForeground)
     m_client.FocusIn();
   else {
+    _InvalidateChatouUndo();
     m_client.FocusOut();
     _AbortComposition();
   }
@@ -92,6 +109,13 @@ STDAPI WeaselTSF::OnTestKeyDown(ITfContext* pContext,
     *pfEaten = TRUE;
     return S_OK;
   }
+  if (IsChatouUndoKey(wParam) && _UndoChatouReplacement(pContext)) {
+    *pfEaten = TRUE;
+    _fTestKeyDownPending = TRUE;
+    return S_OK;
+  }
+  if (!IsModifierKey(wParam))
+    _InvalidateChatouUndo();
   _ProcessKeyEvent(wParam, lParam, pfEaten);
   _UpdateComposition(pContext);
   if (*pfEaten)
@@ -108,6 +132,12 @@ STDAPI WeaselTSF::OnKeyDown(ITfContext* pContext,
     _fTestKeyDownPending = FALSE;
     *pfEaten = TRUE;
   } else {
+    if (IsChatouUndoKey(wParam) && _UndoChatouReplacement(pContext)) {
+      *pfEaten = TRUE;
+      return S_OK;
+    }
+    if (!IsModifierKey(wParam))
+      _InvalidateChatouUndo();
     _ProcessKeyEvent(wParam, lParam, pfEaten);
     _UpdateComposition(pContext);
   }

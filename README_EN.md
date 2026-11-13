@@ -65,7 +65,9 @@ The current version stores API keys in local configuration files without OS cred
 | macOS | Planned | Requires a macOS input-method frontend and new installer/settings integration |
 | iOS / iPadOS | Research | Requires a separate keyboard extension and cannot fully reproduce the Windows F8 workflow |
 
-The prompt, language, and model-call logic can be reused. The current TSF integration, WinHTTP client, registry handling, hotkey flow, clipboard replacement, installer, and settings app are Windows-specific.
+The prompt, language, and model-call logic can be reused. The current TSF integration, WinHTTP client, registry handling, hotkey flow, text-edit transactions, installer, and settings app are Windows-specific.
+
+After an AI transformation, press `Ctrl + Z` immediately to restore the original text. If no valid Chatou transformation is available, the shortcut is passed through to the current application unchanged.
 
 ## Build from source
 

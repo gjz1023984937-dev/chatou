@@ -3,6 +3,7 @@
 #include "EditSession.h"
 #include "ResponseParser.h"
 #include "CandidateList.h"
+#include <vector>
 
 /* Start Composition */
 class CStartCompositionEditSession : public CEditSession {
@@ -379,6 +380,121 @@ BOOL WeaselTSF::_InsertText(com_ptr<ITfContext> pContext,
   }
 
   return TRUE;
+}
+
+BOOL WeaselTSF::_ApplyChatouReplacement(TfEditCookie ec,
+                                        com_ptr<ITfContext> pContext,
+                                        const std::wstring& expected,
+                                        const std::wstring& replacement,
+                                        BOOL recordUndo) {
+  if (!pContext || expected.empty())
+    return FALSE;
+
+  TF_SELECTION selection = {};
+  ULONG fetchedSelections = 0;
+  if (FAILED(pContext->GetSelection(ec, TF_DEFAULT_SELECTION, 1, &selection,
+                                    &fetchedSelections)) ||
+      fetchedSelections != 1 || !selection.range) {
+    return FALSE;
+  }
+
+  com_ptr<ITfRange> range;
+  range.Attach(selection.range);
+  BOOL isEmpty = FALSE;
+  if (FAILED(range->IsEmpty(ec, &isEmpty)) || !isEmpty)
+    return FALSE;
+
+  LONG shifted = 0;
+  if (FAILED(range->ShiftStart(ec, -static_cast<LONG>(expected.size()),
+                               &shifted, nullptr)) ||
+      shifted != -static_cast<LONG>(expected.size())) {
+    return FALSE;
+  }
+
+  std::vector<wchar_t> current(expected.size() + 1, L'\0');
+  ULONG fetchedText = 0;
+  if (FAILED(range->GetText(ec, 0, current.data(),
+                            static_cast<ULONG>(expected.size()),
+                            &fetchedText)) ||
+      fetchedText != expected.size() ||
+      std::wstring(current.data(), fetchedText) != expected) {
+    return FALSE;
+  }
+
+  if (FAILED(range->SetText(ec, TF_ST_CORRECTION, replacement.c_str(),
+                            static_cast<LONG>(replacement.size())))) {
+    return FALSE;
+  }
+
+  range->Collapse(ec, TF_ANCHOR_END);
+  TF_SELECTION newSelection = {};
+  newSelection.range = range;
+  newSelection.style.ase = TF_AE_NONE;
+  newSelection.style.fInterimChar = FALSE;
+  if (FAILED(pContext->SetSelection(ec, 1, &newSelection)))
+    return FALSE;
+
+  if (recordUndo) {
+    _chatouUndoContext = pContext;
+    _chatouUndoOriginal = expected;
+    _chatouUndoResult = replacement;
+    _chatouUndoValid = TRUE;
+  } else {
+    _InvalidateChatouUndo();
+  }
+  return TRUE;
+}
+
+class CChatouUndoEditSession : public CEditSession {
+ public:
+  CChatouUndoEditSession(com_ptr<WeaselTSF> service,
+                         com_ptr<ITfContext> context,
+                         const std::wstring& result,
+                         const std::wstring& original)
+      : CEditSession(service, context),
+        _result(result),
+        _original(original) {}
+
+  STDMETHODIMP DoEditSession(TfEditCookie ec) override {
+    return _pTextService->_ApplyChatouReplacement(
+               ec, _pContext, _result, _original, FALSE)
+               ? S_OK
+               : E_FAIL;
+  }
+
+ private:
+  std::wstring _result;
+  std::wstring _original;
+};
+
+BOOL WeaselTSF::_UndoChatouReplacement(com_ptr<ITfContext> pContext) {
+  if (!_chatouUndoValid || !pContext || pContext != _chatouUndoContext)
+    return FALSE;
+
+  std::wstring result = _chatouUndoResult;
+  std::wstring original = _chatouUndoOriginal;
+
+  com_ptr<CChatouUndoEditSession> editSession;
+  editSession.Attach(
+      new CChatouUndoEditSession(this, pContext, result, original));
+  if (!editSession)
+    return FALSE;
+
+  HRESULT sessionResult = E_FAIL;
+  HRESULT requestResult = pContext->RequestEditSession(
+      _tfClientId, editSession, TF_ES_SYNC | TF_ES_READWRITE,
+      &sessionResult);
+  // Only consume Ctrl+Z when the checked restoration completed. If the host
+  // refuses a synchronous edit session or the caret/text no longer matches,
+  // return FALSE so its native undo stack receives the shortcut unchanged.
+  return SUCCEEDED(requestResult) && SUCCEEDED(sessionResult);
+}
+
+void WeaselTSF::_InvalidateChatouUndo() {
+  _chatouUndoValid = FALSE;
+  _chatouUndoContext.Release();
+  _chatouUndoOriginal.clear();
+  _chatouUndoResult.clear();
 }
 
 void WeaselTSF::_UpdateComposition(com_ptr<ITfContext> pContext) {

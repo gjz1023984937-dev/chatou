@@ -110,6 +110,14 @@ input::placeholder { color: #a3acba; }
 .section-title > div { display: flex; align-items: baseline; gap: 9px; }
 .section-title span { font-size: 12px; font-weight: 700; }
 .section-title small { color: var(--muted-2); font-size: 9.5px; }
+.recent-title { margin-top: 18px; }
+.recent-card { padding: 13px 15px; background: rgba(255,255,255,.82); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+.recent-chips { min-height: 27px; }
+.recent-empty { padding: 5px 1px; color: var(--muted-2); font-size: 9.5px; }
+.recent-chip { position: relative; padding-right: 26px; background: var(--primary-soft); border-color: #d8e2ff; }
+.recent-chip::after { content: "↺"; position: absolute; right: 9px; color: #8ca0d8; font-size: 10px; }
+.text-button { padding: 2px 0; color: var(--muted-2); background: transparent; border: 0; font-size: 9.5px; cursor: pointer; }
+.text-button:hover { color: #b84048; }
 
 .style-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 11px; }
 .style-card { padding: 15px; border-radius: 14px; }
