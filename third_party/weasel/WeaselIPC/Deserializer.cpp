@@ -2,6 +2,7 @@
 #include "Deserializer.h"
 #include "ActionLoader.h"
 #include "Committer.h"
+#include "ChatouReplacer.h"
 #include "ContextUpdater.h"
 #include "Configurator.h"
 #include "Styler.h"
@@ -17,6 +18,7 @@ void Deserializer::Initialize(ResponseParser* pTarget) {
     // actions here
     Define(L"action", ActionLoader::Create);
     Define(L"commit", Committer::Create);
+    Define(L"chatou", ChatouReplacer::Create);
     Define(L"ctx", ContextUpdater::Create);
     Define(L"status", StatusUpdater::Create);
     Define(L"config", Configurator::Create);

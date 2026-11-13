@@ -85,11 +85,27 @@ void test_4() {
   BOOST_TEST_EQ(1, c.totalPages);
 }
 
+void test_chatou_replacement() {
+  WCHAR resp[] =
+      L"action=chatou\n"
+      L"chatou.original=第一行\\n第二行\n"
+      L"chatou.replacement=first line\\nsecond line\n";
+  DWORD len = wcslen(resp);
+  std::wstring original;
+  std::wstring replacement;
+  weasel::ResponseParser parser(NULL, NULL, NULL, NULL, NULL, &original,
+                                &replacement);
+  parser(resp, len);
+  BOOST_TEST(original == L"第一行\n第二行");
+  BOOST_TEST(replacement == L"first line\nsecond line");
+}
+
 int _tmain(int argc, _TCHAR* argv[]) {
   test_1();
   test_2();
   test_3();
   test_4();
+  test_chatou_replacement();
 
   system("pause");
   return boost::report_errors();

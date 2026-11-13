@@ -3,6 +3,7 @@
 #include "EditSession.h"
 #include "ResponseParser.h"
 #include "CandidateList.h"
+#include <KeyEvent.h>
 #include <vector>
 
 /* Start Composition */
@@ -487,7 +488,18 @@ BOOL WeaselTSF::_UndoChatouReplacement(com_ptr<ITfContext> pContext) {
   // Only consume Ctrl+Z when the checked restoration completed. If the host
   // refuses a synchronous edit session or the caret/text no longer matches,
   // return FALSE so its native undo stack receives the shortcut unchanged.
-  return SUCCEEDED(requestResult) && SUCCEEDED(sessionResult);
+  bool restored = SUCCEEDED(requestResult) && SUCCEEDED(sessionResult);
+  if (restored && _EnsureServerConnected()) {
+    // Tell the plugin that the just-restored source may be translated once
+    // more. Drain the response immediately so it cannot be mistaken for the
+    // next real key event. Notification failure does not undo the document
+    // restoration and therefore must not leak Ctrl+Z to the host.
+    weasel::KeyEvent key(ibus::F23, ibus::NULL_MASK);
+    m_client.ProcessKeyEvent(key);
+    weasel::ResponseParser parser(NULL, NULL, &_status, NULL, &_cand->style());
+    m_client.GetResponseData(std::ref(parser));
+  }
+  return restored;
 }
 
 void WeaselTSF::_InvalidateChatouUndo() {

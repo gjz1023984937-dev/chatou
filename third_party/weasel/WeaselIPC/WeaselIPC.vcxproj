@@ -296,6 +296,7 @@
     <ClCompile Include="WeaselClientImpl.cpp" />
     <ClCompile Include="ActionLoader.cpp" />
     <ClCompile Include="Committer.cpp" />
+    <ClCompile Include="ChatouReplacer.cpp" />
     <ClCompile Include="ContextUpdater.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -310,6 +311,7 @@
     <ClInclude Include="..\include\WeaselIPC.h" />
     <ClInclude Include="ActionLoader.h" />
     <ClInclude Include="Committer.h" />
+    <ClInclude Include="ChatouReplacer.h" />
     <ClInclude Include="ContextUpdater.h" />
   </ItemGroup>
   <ItemGroup>
