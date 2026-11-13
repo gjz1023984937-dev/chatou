@@ -29,8 +29,14 @@ if (-not (Test-Path (Join-Path $taskWtlInclude "atlapp.h"))) {
 }
 
 $taskVcvars = @(
+    "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat",
+    "${env:ProgramFiles}\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat",
+    "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat",
+    "${env:ProgramFiles}\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat",
     "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat",
     "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat",
+    "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat",
+    "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat",
     "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvarsall.bat",
     "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat"
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
@@ -61,15 +67,17 @@ Copy-Item (Join-Path $taskWtlInclude "*") (Join-Path $taskWeaselRoot "include\wt
 $env:BOOST_ROOT = $taskBoostRoot
 $env:VERSION_MAJOR = "0"
 $env:VERSION_MINOR = "8"
-$env:VERSION_PATCH = "6"
-$env:FILE_VERSION = '"0.8.6.0"'
-$env:PRODUCT_VERSION = '"0.8.6.0"'
+$env:VERSION_PATCH = "7"
+$env:FILE_VERSION = '"0.8.7.0"'
+$env:PRODUCT_VERSION = '"0.8.7.0"'
 
 Set-Location $taskWeaselRoot
 xmake f -p windows -a x64 -m release -y
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-xmake build -j4 -y WeaselTSF WeaselServer WeaselDeployer
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+foreach ($taskTarget in @("WeaselTSF", "WeaselServer", "WeaselDeployer")) {
+    xmake build -j4 -y $taskTarget
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
 
 Write-Host ""
 Write-Host "=== Chatou Weasel build complete ==="
