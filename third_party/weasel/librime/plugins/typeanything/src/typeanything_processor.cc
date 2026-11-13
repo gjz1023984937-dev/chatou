@@ -357,7 +357,7 @@ inline void TranslateLog(TranslateLogRec rec) {
 std::string BuildTsfReplaceCommand(const std::string& original,
                                    const std::string& replacement) {
   static const char kPrefix[] =
-      "\xEE\x80\x80CHATOU_REPLACE_V1\xEE\x80\x81";  // U+E000 ... U+E001
+      "\xEE\x80\x80" "CHATOU_REPLACE_V1\xEE\x80\x81";  // U+E000 ... U+E001
   static const char kSeparator[] = "\xEE\x80\x82";   // U+E002
   return std::string(kPrefix) + original + kSeparator + replacement;
 }
