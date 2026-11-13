@@ -81,7 +81,7 @@ jobs:
           $env:PLATFORM_TOOLSET = "v143"
           @(
             "set BOOST_ROOT=$env:BOOST_ROOT"
-            "set CMAKE_GENERATOR=Visual Studio 17 2022"
+            'set CMAKE_GENERATOR="Visual Studio 17 2022"'
             "set ARCH=x64"
             "set PLATFORM_TOOLSET=v143"
           ) | Set-Content -Path (Join-Path $librimeRoot "env.bat") -Encoding ascii
