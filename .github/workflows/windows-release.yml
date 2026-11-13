@@ -102,11 +102,11 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          & .\_build_weasel_xmake.ps1
+          & (Join-Path $env:GITHUB_WORKSPACE "_build_weasel_xmake.ps1")
           if ($LASTEXITCODE -ne 0) { throw "Weasel build failed: $LASTEXITCODE" }
-          & .\tools\ta-settings\_build.ps1
+          & (Join-Path $env:GITHUB_WORKSPACE "tools\ta-settings\_build.ps1")
           if ($LASTEXITCODE -ne 0) { throw "Settings build failed: $LASTEXITCODE" }
-          & .\tools\ta-installer\_build.ps1
+          & (Join-Path $env:GITHUB_WORKSPACE "tools\ta-installer\_build.ps1")
           if ($LASTEXITCODE -ne 0) { throw "Installer build failed: $LASTEXITCODE" }
 
       - name: Stage release files
