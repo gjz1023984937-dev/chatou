@@ -1632,7 +1632,7 @@ static void DoInstall(InstallOptions opts) {
                    " copy_ec=" + std::to_string(ec.value()));
 
     // 31. Add/Remove Programs entry.
-    WriteUninstallRegistry(wdir, L"0.8.6");
+    WriteUninstallRegistry(wdir, L"0.8.7");
     // This is an in-place upgrade from TypeAnything. Remove the legacy
     // Add/Remove Programs entry so Windows does not show two products.
     RegDeleteKeyExW(

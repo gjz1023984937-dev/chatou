@@ -1,0 +1,169 @@
+name: Build Windows release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "release/**"
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CHATOU_VERSION: "0.8.7"
+  LIBRIME_VERSION: "1.13.1"
+  BOOST_VERSION: "1.84.0"
+  BOOST_ARCHIVE_VERSION: "1_84_0"
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    timeout-minutes: 120
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install xmake
+        shell: pwsh
+        run: |
+          choco install xmake --yes --no-progress
+          xmake --version
+
+      - name: Prepare Boost and WTL
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $boostRoot = Join-Path $env:RUNNER_TEMP "boost_$env:BOOST_ARCHIVE_VERSION"
+          $boostZip = Join-Path $env:RUNNER_TEMP "boost.zip"
+          Invoke-WebRequest `
+            -Uri "https://archives.boost.io/release/$env:BOOST_VERSION/source/boost_$env:BOOST_ARCHIVE_VERSION.zip" `
+            -OutFile $boostZip
+          Expand-Archive -LiteralPath $boostZip -DestinationPath $env:RUNNER_TEMP -Force
+          Push-Location $boostRoot
+          & .\bootstrap.bat
+          if ($LASTEXITCODE -ne 0) { throw "Boost bootstrap failed: $LASTEXITCODE" }
+          & .\b2.exe -j2 toolset=msvc-14.3 address-model=64 variant=release `
+            link=static runtime-link=static `
+            --with-atomic --with-chrono --with-date_time --with-serialization `
+            --with-system --with-thread stage
+          if ($LASTEXITCODE -ne 0) { throw "Boost build failed: $LASTEXITCODE" }
+          Pop-Location
+
+          $wtlRoot = Join-Path $env:RUNNER_TEMP "WTL"
+          git clone --depth 1 https://github.com/Win32-WTL/WTL.git $wtlRoot
+
+          "BOOST_ROOT=$boostRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "WTL_ROOT=$wtlRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build librime with Chatou plugin
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $librimeRoot = Join-Path $env:RUNNER_TEMP "librime"
+          git clone --recursive --depth 1 --branch $env:LIBRIME_VERSION `
+            https://github.com/rime/librime.git $librimeRoot
+
+          $pluginSource = Join-Path $env:GITHUB_WORKSPACE "third_party\weasel\librime\plugins\typeanything"
+          $pluginTarget = Join-Path $librimeRoot "plugins\typeanything"
+          New-Item -ItemType Directory -Path $pluginTarget -Force | Out-Null
+          Copy-Item (Join-Path $pluginSource "*") $pluginTarget -Recurse -Force
+
+          $env:CMAKE_GENERATOR = "Visual Studio 17 2022"
+          $env:ARCH = "x64"
+          $env:PLATFORM_TOOLSET = "v143"
+          Push-Location $librimeRoot
+          & cmd.exe /D /C "build.bat deps"
+          if ($LASTEXITCODE -ne 0) { throw "librime dependency build failed: $LASTEXITCODE" }
+          & cmd.exe /D /C "build.bat librime"
+          if ($LASTEXITCODE -ne 0) { throw "librime build failed: $LASTEXITCODE" }
+          Pop-Location
+
+          $rimeDestination = Join-Path $env:GITHUB_WORKSPACE "third_party\weasel\librime\dist"
+          if (Test-Path $rimeDestination) {
+            Remove-Item $rimeDestination -Recurse -Force
+          }
+          Copy-Item (Join-Path $librimeRoot "dist") $rimeDestination -Recurse -Force
+
+      - name: Build Chatou binaries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          & .\_build_weasel_xmake.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Weasel build failed: $LASTEXITCODE" }
+          & .\tools\ta-settings\_build.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Settings build failed: $LASTEXITCODE" }
+          & .\tools\ta-installer\_build.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Installer build failed: $LASTEXITCODE" }
+
+      - name: Stage release files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $stage = Join-Path $env:GITHUB_WORKSPACE "release-staging"
+          $package = Join-Path $stage "Chatou-v$env:CHATOU_VERSION"
+          New-Item -ItemType Directory -Path $package -Force | Out-Null
+
+          $builtInstaller = Join-Path $env:GITHUB_WORKSPACE `
+            "tools\ta-installer\build\windows\x64\release\ta-installer.exe"
+          if (-not (Test-Path $builtInstaller)) {
+            throw "Installer output missing: $builtInstaller"
+          }
+
+          $installerName = "Chatou-Installer-v$env:CHATOU_VERSION.exe"
+          $installer = Join-Path $stage $installerName
+          Copy-Item $builtInstaller $installer -Force
+          Copy-Item $installer (Join-Path $package $installerName) -Force
+          Copy-Item `
+            (Join-Path $env:GITHUB_WORKSPACE "docs\releases\v$env:CHATOU_VERSION.md") `
+            (Join-Path $package "README.md") -Force
+
+          $patchFile = Join-Path $package "changes-since-v0.8.6.patch"
+          & git format-patch --stdout "v0.8.6..HEAD" | Set-Content -Path $patchFile -Encoding utf8
+
+          $zip = Join-Path $stage "Chatou-v$env:CHATOU_VERSION-package.zip"
+          Compress-Archive -LiteralPath $package -DestinationPath $zip -CompressionLevel Optimal -Force
+
+          $hashFile = Join-Path $stage "SHA256SUMS.txt"
+          @($installer, $zip) | ForEach-Object {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $_).Hash.ToLowerInvariant()
+            "$hash  $([System.IO.Path]::GetFileName($_))"
+          } | Set-Content -Path $hashFile -Encoding ascii
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chatou-v${{ env.CHATOU_VERSION }}-windows
+          path: |
+            release-staging/Chatou-Installer-v${{ env.CHATOU_VERSION }}.exe
+            release-staging/Chatou-v${{ env.CHATOU_VERSION }}-package.zip
+            release-staging/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $stage = Join-Path $env:GITHUB_WORKSPACE "release-staging"
+          $notes = Join-Path $stage "release-notes.md"
+          Get-Content `
+            (Join-Path $env:GITHUB_WORKSPACE "docs\releases\v$env:CHATOU_VERSION.md") `
+            -Raw | Set-Content -Path $notes -Encoding utf8
+          Add-Content -Path $notes -Encoding utf8 -Value "`n## SHA-256`n`n``````text"
+          Get-Content (Join-Path $stage "SHA256SUMS.txt") |
+            Add-Content -Path $notes -Encoding utf8
+          Add-Content -Path $notes -Encoding utf8 -Value "```````n"
+
+          gh release create "v$env:CHATOU_VERSION" `
+            (Join-Path $stage "Chatou-Installer-v$env:CHATOU_VERSION.exe") `
+            (Join-Path $stage "Chatou-v$env:CHATOU_VERSION-package.zip") `
+            (Join-Path $stage "SHA256SUMS.txt") `
+            --title "Chatou v$env:CHATOU_VERSION" `
+            --notes-file $notes
