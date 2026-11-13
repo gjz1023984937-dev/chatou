@@ -72,8 +72,10 @@ $env:PRODUCT_VERSION = '"0.8.7.0"'
 Set-Location $taskWeaselRoot
 xmake f -p windows -a x64 -m release -y
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-xmake build -j4 -y WeaselTSF WeaselServer WeaselDeployer
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+foreach ($taskTarget in @("WeaselTSF", "WeaselServer", "WeaselDeployer")) {
+    xmake build -j4 -y $taskTarget
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
 
 Write-Host ""
 Write-Host "=== Chatou Weasel build complete ==="
