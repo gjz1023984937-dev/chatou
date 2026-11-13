@@ -4,7 +4,114 @@
 #include "ResponseParser.h"
 #include "CandidateList.h"
 #include <KeyEvent.h>
+#include <cwctype>
 #include <vector>
+
+namespace {
+
+bool IsNativeEditControl(HWND hwnd) {
+  wchar_t className[128] = {};
+  if (!hwnd || !GetClassNameW(hwnd, className, _countof(className)))
+    return false;
+  std::wstring name(className);
+  for (wchar_t& ch : name)
+    ch = static_cast<wchar_t>(std::towlower(ch));
+  return name == L"edit" || name.find(L"richedit") != std::wstring::npos;
+}
+
+bool ReplaceInNativeEdit(HWND hwnd,
+                         const std::wstring& expected,
+                         const std::wstring& replacement) {
+  if (!IsNativeEditControl(hwnd))
+    return false;
+
+  DWORD selectionStart = 0;
+  DWORD selectionEnd = 0;
+  SendMessageW(hwnd, EM_GETSEL, reinterpret_cast<WPARAM>(&selectionStart),
+               reinterpret_cast<LPARAM>(&selectionEnd));
+  if (selectionStart != selectionEnd || selectionStart < expected.size())
+    return false;
+
+  int textLength = GetWindowTextLengthW(hwnd);
+  if (textLength < 0 || textLength > 1024 * 1024 ||
+      selectionStart > static_cast<DWORD>(textLength)) {
+    return false;
+  }
+  std::vector<wchar_t> text(static_cast<size_t>(textLength) + 1, L'\0');
+  int copied = GetWindowTextW(hwnd, text.data(), textLength + 1);
+  if (copied < 0 || selectionStart > static_cast<DWORD>(copied))
+    return false;
+
+  size_t sourceStart = selectionStart - expected.size();
+  if (std::wstring(text.data() + sourceStart, expected.size()) != expected)
+    return false;
+
+  SendMessageW(hwnd, EM_SETSEL, sourceStart, selectionEnd);
+  SendMessageW(hwnd, EM_REPLACESEL, TRUE,
+               reinterpret_cast<LPARAM>(replacement.c_str()));
+  return true;
+}
+
+size_t Utf16CharacterCount(const std::wstring& text) {
+  size_t count = 0;
+  for (size_t i = 0; i < text.size(); ++i) {
+    wchar_t ch = text[i];
+    if (ch >= 0xD800 && ch <= 0xDBFF && i + 1 < text.size() &&
+        text[i + 1] >= 0xDC00 && text[i + 1] <= 0xDFFF) {
+      ++i;
+    }
+    ++count;
+  }
+  return count;
+}
+
+void AppendVirtualKey(std::vector<INPUT>* inputs, WORD key, DWORD flags = 0) {
+  INPUT input = {};
+  input.type = INPUT_KEYBOARD;
+  input.ki.wVk = key;
+  input.ki.dwFlags = flags;
+  input.ki.dwExtraInfo = CHATOU_INJECTED_INPUT_TAG;
+  inputs->push_back(input);
+}
+
+void AppendUnicode(std::vector<INPUT>* inputs, wchar_t ch, DWORD flags = 0) {
+  INPUT input = {};
+  input.type = INPUT_KEYBOARD;
+  input.ki.wScan = ch;
+  input.ki.dwFlags = KEYEVENTF_UNICODE | flags;
+  input.ki.dwExtraInfo = CHATOU_INJECTED_INPUT_TAG;
+  inputs->push_back(input);
+}
+
+bool ReplaceWithKeyboardInput(const std::wstring& expected,
+                              const std::wstring& replacement) {
+  if (!GetFocus() || expected.empty() || expected.size() > 4096 ||
+      replacement.size() > 4096) {
+    return false;
+  }
+
+  size_t sourceCharacters = Utf16CharacterCount(expected);
+  std::vector<INPUT> inputs;
+  inputs.reserve(2 + sourceCharacters * 2 + replacement.size() * 2);
+
+  AppendVirtualKey(&inputs, VK_SHIFT);
+  for (size_t i = 0; i < sourceCharacters; ++i) {
+    AppendVirtualKey(&inputs, VK_LEFT);
+    AppendVirtualKey(&inputs, VK_LEFT, KEYEVENTF_KEYUP);
+  }
+  AppendVirtualKey(&inputs, VK_SHIFT, KEYEVENTF_KEYUP);
+
+  for (wchar_t ch : replacement) {
+    AppendUnicode(&inputs, ch);
+    AppendUnicode(&inputs, ch, KEYEVENTF_KEYUP);
+  }
+
+  return !inputs.empty() &&
+         SendInput(static_cast<UINT>(inputs.size()), inputs.data(),
+                   sizeof(INPUT)) == inputs.size();
+}
+
+}  // namespace
 
 /* Start Composition */
 class CStartCompositionEditSession : public CEditSession {
@@ -432,18 +539,34 @@ BOOL WeaselTSF::_ApplyChatouReplacement(TfEditCookie ec,
   newSelection.range = range;
   newSelection.style.ase = TF_AE_NONE;
   newSelection.style.fInterimChar = FALSE;
-  if (FAILED(pContext->SetSelection(ec, 1, &newSelection)))
-    return FALSE;
+  // Some hosts update the caret themselves after SetText but reject an
+  // explicit SetSelection. The text mutation already succeeded, so do not
+  // run a second fallback replacement in that case.
+  pContext->SetSelection(ec, 1, &newSelection);
 
   if (recordUndo) {
-    _chatouUndoContext = pContext;
-    _chatouUndoOriginal = expected;
-    _chatouUndoResult = replacement;
-    _chatouUndoValid = TRUE;
+    _RecordChatouUndo(pContext, expected, replacement);
   } else {
     _InvalidateChatouUndo();
   }
   return TRUE;
+}
+
+BOOL WeaselTSF::_ApplyChatouFallback(const std::wstring& expected,
+                                     const std::wstring& replacement) {
+  HWND focused = GetFocus();
+  if (ReplaceInNativeEdit(focused, expected, replacement))
+    return TRUE;
+  return ReplaceWithKeyboardInput(expected, replacement) ? TRUE : FALSE;
+}
+
+void WeaselTSF::_RecordChatouUndo(com_ptr<ITfContext> pContext,
+                                  const std::wstring& original,
+                                  const std::wstring& result) {
+  _chatouUndoContext = pContext;
+  _chatouUndoOriginal = original;
+  _chatouUndoResult = result;
+  _chatouUndoValid = TRUE;
 }
 
 class CChatouUndoEditSession : public CEditSession {
@@ -489,6 +612,11 @@ BOOL WeaselTSF::_UndoChatouReplacement(com_ptr<ITfContext> pContext) {
   // refuses a synchronous edit session or the caret/text no longer matches,
   // return FALSE so its native undo stack receives the shortcut unchanged.
   bool restored = SUCCEEDED(requestResult) && SUCCEEDED(sessionResult);
+  if (!restored) {
+    restored = !!_ApplyChatouFallback(result, original);
+    if (restored)
+      _InvalidateChatouUndo();
+  }
   if (restored && _EnsureServerConnected()) {
     // Tell the plugin that the just-restored source may be translated once
     // more. Drain the response immediately so it cannot be mistaken for the

@@ -25,6 +25,12 @@ bool IsModifierKey(WPARAM wParam) {
 }  // namespace
 
 void WeaselTSF::_ProcessKeyEvent(WPARAM wParam, LPARAM lParam, BOOL* pfEaten) {
+  if (static_cast<ULONG_PTR>(GetMessageExtraInfo()) ==
+      CHATOU_INJECTED_INPUT_TAG) {
+    *pfEaten = FALSE;
+    return;
+  }
+
   // when _IsKeyboardDisabled don't eat the key,
   // when keyboard closable and keyboard closed, don't eat the key
   if ((_isToOpenClose && !_IsKeyboardOpen()) || _IsKeyboardDisabled()) {
@@ -114,7 +120,9 @@ STDAPI WeaselTSF::OnTestKeyDown(ITfContext* pContext,
     _fTestKeyDownPending = TRUE;
     return S_OK;
   }
-  if (!IsModifierKey(wParam))
+  if (!IsModifierKey(wParam) &&
+      static_cast<ULONG_PTR>(GetMessageExtraInfo()) !=
+          CHATOU_INJECTED_INPUT_TAG)
     _InvalidateChatouUndo();
   _ProcessKeyEvent(wParam, lParam, pfEaten);
   _UpdateComposition(pContext);
@@ -136,7 +144,9 @@ STDAPI WeaselTSF::OnKeyDown(ITfContext* pContext,
       *pfEaten = TRUE;
       return S_OK;
     }
-    if (!IsModifierKey(wParam))
+    if (!IsModifierKey(wParam) &&
+        static_cast<ULONG_PTR>(GetMessageExtraInfo()) !=
+            CHATOU_INJECTED_INPUT_TAG)
       _InvalidateChatouUndo();
     _ProcessKeyEvent(wParam, lParam, pfEaten);
     _UpdateComposition(pContext);

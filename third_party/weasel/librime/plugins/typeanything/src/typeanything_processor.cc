@@ -50,11 +50,24 @@ struct TypeAnythingProcessor::AsyncState {
   uint64_t pending_request_id = 0;
   uint64_t pending_activity_id = 0;
   std::uintptr_t pending_window = 0;
+  std::uintptr_t pending_focus = 0;
   std::string pending_original;
   std::string pending_result;
   std::string last_replaced_original;
   std::string retranslate_once;
 };
+
+std::uintptr_t FocusedInputWindow() {
+  HWND foreground = GetForegroundWindow();
+  if (!foreground)
+    return 0;
+  DWORD threadId = GetWindowThreadProcessId(foreground, nullptr);
+  GUITHREADINFO info = {};
+  info.cbSize = sizeof(info);
+  if (threadId && GetGUIThreadInfo(threadId, &info) && info.hwndFocus)
+    return reinterpret_cast<std::uintptr_t>(info.hwndFocus);
+  return reinterpret_cast<std::uintptr_t>(foreground);
+}
 
 // Languages supported. Tray "Switch Language" submenu writes the chosen code
 // to %APPDATA%\Rime\typeanything_lang.txt; plugin reads it on each F8.
@@ -549,7 +562,8 @@ rime::ProcessResult TypeAnythingProcessor::ProcessKeyEvent(
               async_state_->pending_request_id == async_state_->request_id.load() &&
               async_state_->pending_activity_id == async_state_->activity_id.load() &&
               async_state_->pending_window ==
-                  reinterpret_cast<std::uintptr_t>(GetForegroundWindow());
+                  reinterpret_cast<std::uintptr_t>(GetForegroundWindow()) &&
+              async_state_->pending_focus == FocusedInputWindow();
       if (ready) {
         original = std::move(async_state_->pending_original);
         result = std::move(async_state_->pending_result);
@@ -678,6 +692,7 @@ void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
   uint64_t activity_at_dispatch = state->activity_id.load();
   std::uintptr_t request_window =
       reinterpret_cast<std::uintptr_t>(GetForegroundWindow());
+  std::uintptr_t request_focus = FocusedInputWindow();
   std::string raw_lang = ResolveTargetLang();
   // No-translate mode: skip LLM call when the lang picker selects "off".
   if (raw_lang == "none" || raw_lang == "None" || raw_lang == "no-translate" ||
@@ -713,9 +728,9 @@ void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
 
   // Spawn a worker without retaining `this`. The result is queued in shared
   // state and later consumed on Rime's input thread via the synthetic F24.
-  std::thread([state, this_id, activity_at_dispatch, request_window, chinese,
-               lang, system_prompt, api_key, model, endpoint, path, temp,
-               category]() {
+  std::thread([state, this_id, activity_at_dispatch, request_window,
+               request_focus, chinese, lang, system_prompt, api_key, model,
+               endpoint, path, temp, category]() {
     // Logging bundle — populated as we progress; dispatched on every exit
     // path via TranslateLog() (which is itself a detached thread, so no
     // disk I/O blocks the IME hot path).
@@ -767,7 +782,8 @@ void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
     if (!state->alive.load() || this_id != state->request_id.load() ||
         activity_at_dispatch != state->activity_id.load() ||
         request_window !=
-            reinterpret_cast<std::uintptr_t>(GetForegroundWindow())) {
+            reinterpret_cast<std::uintptr_t>(GetForegroundWindow()) ||
+        request_focus != FocusedInputWindow()) {
       log_rec.result = "superseded";
       TranslateLog(std::move(log_rec));
       return;
@@ -813,6 +829,7 @@ void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
       state->pending_request_id = this_id;
       state->pending_activity_id = activity_at_dispatch;
       state->pending_window = request_window;
+      state->pending_focus = request_focus;
       state->pending_original = chinese;
       state->pending_result = english;
       state->pending_ready = true;
