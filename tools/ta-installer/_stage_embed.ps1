@@ -126,10 +126,16 @@ $rcExe = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Directory -
              $candidate = Join-Path $_.FullName "x64\rc.exe"
              if (Test-Path $candidate) { return $candidate }
          } | Select-Object -First 1
-$cvtres = Get-ChildItem "${env:ProgramFiles(x86)}\Microsoft Visual Studio" -Recurse `
-          -Filter cvtres.exe -File -ErrorAction SilentlyContinue |
-          Where-Object { $_.FullName -match '\\bin\\Host[xX]64\\x64\\cvtres\.exe$' } |
-          Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+$cvtres = (Get-Command cvtres.exe -ErrorAction SilentlyContinue).Source
+if (-not $cvtres) {
+    $cvtres = @(
+        "${env:ProgramFiles}\Microsoft Visual Studio",
+        "${env:ProgramFiles(x86)}\Microsoft Visual Studio"
+    ) | Where-Object { Test-Path $_ } | ForEach-Object {
+        Get-ChildItem $_ -Recurse -Filter cvtres.exe -File -ErrorAction SilentlyContinue
+    } | Where-Object { $_.FullName -match '\\bin\\Host[xX]64\\x64\\cvtres\.exe$' } |
+        Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+}
 
 if (-not $rcExe)   { throw "rc.exe not found (need Windows SDK)" }
 if (-not $cvtres)  { throw "cvtres.exe not found (need Visual Studio C++ build tools)" }
