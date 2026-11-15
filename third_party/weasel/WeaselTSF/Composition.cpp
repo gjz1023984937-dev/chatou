@@ -92,14 +92,17 @@ bool ReplaceWithKeyboardInput(const std::wstring& expected,
 
   size_t sourceCharacters = Utf16CharacterCount(expected);
   std::vector<INPUT> inputs;
-  inputs.reserve(2 + sourceCharacters * 2 + replacement.size() * 2);
+  inputs.reserve(sourceCharacters * 2 + replacement.size() * 2);
 
-  AppendVirtualKey(&inputs, VK_SHIFT);
+  // Custom editors such as WeChat's chat box do not honor synthetic Shift as
+  // a selection modifier: Shift+Left moves the caret to the start and the
+  // replacement is then inserted before the source (for example Hello你好).
+  // Backspace is handled consistently by these editors and the source/caret
+  // has already been guarded by the request activity and focused HWND checks.
   for (size_t i = 0; i < sourceCharacters; ++i) {
-    AppendVirtualKey(&inputs, VK_LEFT);
-    AppendVirtualKey(&inputs, VK_LEFT, KEYEVENTF_KEYUP);
+    AppendVirtualKey(&inputs, VK_BACK);
+    AppendVirtualKey(&inputs, VK_BACK, KEYEVENTF_KEYUP);
   }
-  AppendVirtualKey(&inputs, VK_SHIFT, KEYEVENTF_KEYUP);
 
   for (wchar_t ch : replacement) {
     AppendUnicode(&inputs, ch);
