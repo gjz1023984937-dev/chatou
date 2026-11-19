@@ -42,6 +42,13 @@ STDAPI WeaselTSF::DoEditSession(TfEditCookie ec) {
     if (!chatouOriginal.empty() && !chatouReplacement.empty()) {
       _committed = _ApplyChatouReplacement(
           ec, _pEditSessionContext, chatouOriginal, chatouReplacement, TRUE);
+      if (!_committed) {
+        _committed = _ApplyChatouFallback(chatouOriginal, chatouReplacement);
+        if (_committed) {
+          _RecordChatouUndo(_pEditSessionContext, chatouOriginal,
+                            chatouReplacement);
+        }
+      }
       _UpdateUI(*context, _status);
       return TRUE;
     }

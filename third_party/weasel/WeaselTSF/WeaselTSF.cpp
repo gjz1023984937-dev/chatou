@@ -146,8 +146,11 @@ STDAPI WeaselTSF::ActivateEx(ITfThreadMgr* pThreadMgr,
   // like some opengl stuff
   _InitDisplayAttributeGuidAtom();
 
-  if (!_InitPreservedKey())
-    goto ExitError;
+  // Preserving F8 is an accelerator-compatibility enhancement, not a
+  // prerequisite for the TIP. Office hosts may already reserve F8 for their
+  // own commands; failing activation here made Windows switch away from
+  // Chatou entirely. The regular TSF key-event sink remains available.
+  _InitPreservedKey();
 
   if (!_InitLanguageBar())
     goto ExitError;

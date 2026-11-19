@@ -25,6 +25,12 @@ bool IsModifierKey(WPARAM wParam) {
 }  // namespace
 
 void WeaselTSF::_ProcessKeyEvent(WPARAM wParam, LPARAM lParam, BOOL* pfEaten) {
+  if (static_cast<ULONG_PTR>(GetMessageExtraInfo()) ==
+      CHATOU_INJECTED_INPUT_TAG) {
+    *pfEaten = FALSE;
+    return;
+  }
+
   // when _IsKeyboardDisabled don't eat the key,
   // when keyboard closable and keyboard closed, don't eat the key
   if ((_isToOpenClose && !_IsKeyboardOpen()) || _IsKeyboardDisabled()) {
@@ -104,6 +110,11 @@ STDAPI WeaselTSF::OnTestKeyDown(ITfContext* pContext,
                                 WPARAM wParam,
                                 LPARAM lParam,
                                 BOOL* pfEaten) {
+  if (static_cast<ULONG_PTR>(GetMessageExtraInfo()) ==
+      CHATOU_INJECTED_INPUT_TAG) {
+    *pfEaten = FALSE;
+    return S_OK;
+  }
   _fTestKeyUpPending = FALSE;
   if (_fTestKeyDownPending) {
     *pfEaten = TRUE;
@@ -114,7 +125,9 @@ STDAPI WeaselTSF::OnTestKeyDown(ITfContext* pContext,
     _fTestKeyDownPending = TRUE;
     return S_OK;
   }
-  if (!IsModifierKey(wParam))
+  if (!IsModifierKey(wParam) &&
+      static_cast<ULONG_PTR>(GetMessageExtraInfo()) !=
+          CHATOU_INJECTED_INPUT_TAG)
     _InvalidateChatouUndo();
   _ProcessKeyEvent(wParam, lParam, pfEaten);
   _UpdateComposition(pContext);
@@ -127,6 +140,11 @@ STDAPI WeaselTSF::OnKeyDown(ITfContext* pContext,
                             WPARAM wParam,
                             LPARAM lParam,
                             BOOL* pfEaten) {
+  if (static_cast<ULONG_PTR>(GetMessageExtraInfo()) ==
+      CHATOU_INJECTED_INPUT_TAG) {
+    *pfEaten = FALSE;
+    return S_OK;
+  }
   _fTestKeyUpPending = FALSE;
   if (_fTestKeyDownPending) {
     _fTestKeyDownPending = FALSE;
@@ -136,7 +154,9 @@ STDAPI WeaselTSF::OnKeyDown(ITfContext* pContext,
       *pfEaten = TRUE;
       return S_OK;
     }
-    if (!IsModifierKey(wParam))
+    if (!IsModifierKey(wParam) &&
+        static_cast<ULONG_PTR>(GetMessageExtraInfo()) !=
+            CHATOU_INJECTED_INPUT_TAG)
       _InvalidateChatouUndo();
     _ProcessKeyEvent(wParam, lParam, pfEaten);
     _UpdateComposition(pContext);
@@ -148,6 +168,11 @@ STDAPI WeaselTSF::OnTestKeyUp(ITfContext* pContext,
                               WPARAM wParam,
                               LPARAM lParam,
                               BOOL* pfEaten) {
+  if (static_cast<ULONG_PTR>(GetMessageExtraInfo()) ==
+      CHATOU_INJECTED_INPUT_TAG) {
+    *pfEaten = FALSE;
+    return S_OK;
+  }
   _fTestKeyDownPending = FALSE;
   if (_fTestKeyUpPending) {
     *pfEaten = TRUE;
@@ -164,6 +189,11 @@ STDAPI WeaselTSF::OnKeyUp(ITfContext* pContext,
                           WPARAM wParam,
                           LPARAM lParam,
                           BOOL* pfEaten) {
+  if (static_cast<ULONG_PTR>(GetMessageExtraInfo()) ==
+      CHATOU_INJECTED_INPUT_TAG) {
+    *pfEaten = FALSE;
+    return S_OK;
+  }
   _fTestKeyDownPending = FALSE;
   if (_fTestKeyUpPending) {
     _fTestKeyUpPending = FALSE;
@@ -180,6 +210,10 @@ STDAPI WeaselTSF::OnPreservedKey(ITfContext* pContext,
                                  REFGUID rguid,
                                  BOOL* pfEaten) {
   *pfEaten = FALSE;
+  if (IsEqualGUID(rguid, GUID_CHATOU_UNDO_PRESERVED_KEY)) {
+    *pfEaten = _UndoChatouReplacement(pContext);
+    return S_OK;
+  }
   if (!IsEqualGUID(rguid, GUID_IME_MODE_PRESERVED_KEY))
     return S_OK;
 
@@ -238,6 +272,18 @@ BOOL WeaselTSF::_InitPreservedKey() {
       &preservedKey,
       description,
       ARRAYSIZE(description) - 1);
+
+  // Custom editors can execute their native undo before the ordinary key
+  // sink receives Ctrl+Z. Preserve it while Chatou is active, consuming it
+  // only when our own restoration succeeds.
+  TF_PRESERVEDKEY undoKey = {};
+  undoKey.uVKey = 'Z';
+  undoKey.uModifiers = TF_MOD_CONTROL;
+  static const WCHAR undoDescription[] = L"Chatou restore original text";
+  pKeystrokeMgr->UnpreserveKey(GUID_CHATOU_UNDO_PRESERVED_KEY, &undoKey);
+  pKeystrokeMgr->PreserveKey(_tfClientId, GUID_CHATOU_UNDO_PRESERVED_KEY,
+                            &undoKey, undoDescription,
+                            ARRAYSIZE(undoDescription) - 1);
   return SUCCEEDED(hr);
 }
 
@@ -254,4 +300,8 @@ void WeaselTSF::_UninitPreservedKey() {
   preservedKey.uModifiers = 0;
   pKeystrokeMgr->UnpreserveKey(GUID_IME_MODE_PRESERVED_KEY,
                                &preservedKey);
+  TF_PRESERVEDKEY undoKey = {};
+  undoKey.uVKey = 'Z';
+  undoKey.uModifiers = TF_MOD_CONTROL;
+  pKeystrokeMgr->UnpreserveKey(GUID_CHATOU_UNDO_PRESERVED_KEY, &undoKey);
 }

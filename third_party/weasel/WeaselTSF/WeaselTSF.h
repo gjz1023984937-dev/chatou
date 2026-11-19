@@ -187,6 +187,11 @@ class WeaselTSF : public ITfTextInputProcessorEx,
                                const std::wstring& expected,
                                const std::wstring& replacement,
                                BOOL recordUndo);
+  BOOL _ApplyChatouFallback(const std::wstring& expected,
+                            const std::wstring& replacement);
+  void _RecordChatouUndo(com_ptr<ITfContext> pContext,
+                         const std::wstring& original,
+                         const std::wstring& result);
   BOOL _UndoChatouReplacement(com_ptr<ITfContext> pContext);
   void _InvalidateChatouUndo();
 

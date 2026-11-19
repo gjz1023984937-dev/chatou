@@ -50,11 +50,24 @@ struct TypeAnythingProcessor::AsyncState {
   uint64_t pending_request_id = 0;
   uint64_t pending_activity_id = 0;
   std::uintptr_t pending_window = 0;
+  std::uintptr_t pending_focus = 0;
   std::string pending_original;
   std::string pending_result;
   std::string last_replaced_original;
   std::string retranslate_once;
 };
+
+std::uintptr_t FocusedInputWindow() {
+  HWND foreground = GetForegroundWindow();
+  if (!foreground)
+    return 0;
+  DWORD threadId = GetWindowThreadProcessId(foreground, nullptr);
+  GUITHREADINFO info = {};
+  info.cbSize = sizeof(info);
+  if (threadId && GetGUIThreadInfo(threadId, &info) && info.hwndFocus)
+    return reinterpret_cast<std::uintptr_t>(info.hwndFocus);
+  return reinterpret_cast<std::uintptr_t>(foreground);
+}
 
 // Languages supported. Tray "Switch Language" submenu writes the chosen code
 // to %APPDATA%\Rime\typeanything_lang.txt; plugin reads it on each F8.
@@ -201,24 +214,34 @@ std::string WinHttpPost(const std::wstring& host,
                         const std::string& bearer_token,
                         const std::string& body,
                         DWORD timeout_ms = 15000,
-                        int* status_code = nullptr) {
+                        int* status_code = nullptr,
+                        DWORD* network_error = nullptr) {
   if (status_code) *status_code = 0;
+  if (network_error) *network_error = ERROR_SUCCESS;
   HINTERNET h_session = WinHttpOpen(L"TypeAnything/1.0",
-                                    WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                    WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                     WINHTTP_NO_PROXY_NAME,
                                     WINHTTP_NO_PROXY_BYPASS, 0);
-  if (!h_session) return "";
+  if (!h_session) {
+    if (network_error) *network_error = GetLastError();
+    return "";
+  }
   WinHttpSetTimeouts(h_session, timeout_ms, timeout_ms, timeout_ms, timeout_ms);
 
   HINTERNET h_conn = WinHttpConnect(h_session, host.c_str(),
                                     INTERNET_DEFAULT_HTTPS_PORT, 0);
-  if (!h_conn) { WinHttpCloseHandle(h_session); return ""; }
+  if (!h_conn) {
+    if (network_error) *network_error = GetLastError();
+    WinHttpCloseHandle(h_session);
+    return "";
+  }
 
   HINTERNET h_req = WinHttpOpenRequest(h_conn, L"POST", path.c_str(),
                                        nullptr, WINHTTP_NO_REFERER,
                                        WINHTTP_DEFAULT_ACCEPT_TYPES,
                                        WINHTTP_FLAG_SECURE);
   if (!h_req) {
+    if (network_error) *network_error = GetLastError();
     WinHttpCloseHandle(h_conn);
     WinHttpCloseHandle(h_session);
     return "";
@@ -235,7 +258,9 @@ std::string WinHttpPost(const std::wstring& host,
                                  (LPVOID)body.data(), (DWORD)body.size(),
                                  (DWORD)body.size(), 0);
   std::string result;
-  if (sent && WinHttpReceiveResponse(h_req, nullptr)) {
+  BOOL received = sent && WinHttpReceiveResponse(h_req, nullptr);
+  if (!received && network_error) *network_error = GetLastError();
+  if (received) {
     if (status_code) {
       DWORD st = 0, slen = sizeof(st);
       WinHttpQueryHeaders(h_req,
@@ -275,6 +300,7 @@ struct TranslateLogRec {
   std::string path;
   std::string model;
   int         http_status = 0;
+  DWORD       network_error = ERROR_SUCCESS;
   std::string response;          // raw response body (will be truncated)
   std::string output;            // extracted translation
   std::string result;            // final outcome ("ok" / error message)
@@ -344,6 +370,7 @@ inline void TranslateLog(TranslateLogRec rec) {
       << " input[0..50]=\""
       << TLogTruncate(TLogOneLine(rec.input_text), 50, "...") << "\"\n"
       << "  http_status=" << rec.http_status << "\n"
+      << "  winhttp_error=" << rec.network_error << "\n"
       << "  response[0..500]="
       << TLogTruncate(TLogOneLine(rec.response), 500, "...(truncated)") << "\n"
       << "  parsed=" << TLogOneLine(rec.output) << "\n"
@@ -549,7 +576,8 @@ rime::ProcessResult TypeAnythingProcessor::ProcessKeyEvent(
               async_state_->pending_request_id == async_state_->request_id.load() &&
               async_state_->pending_activity_id == async_state_->activity_id.load() &&
               async_state_->pending_window ==
-                  reinterpret_cast<std::uintptr_t>(GetForegroundWindow());
+                  reinterpret_cast<std::uintptr_t>(GetForegroundWindow()) &&
+              async_state_->pending_focus == FocusedInputWindow();
       if (ready) {
         original = std::move(async_state_->pending_original);
         result = std::move(async_state_->pending_result);
@@ -678,6 +706,7 @@ void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
   uint64_t activity_at_dispatch = state->activity_id.load();
   std::uintptr_t request_window =
       reinterpret_cast<std::uintptr_t>(GetForegroundWindow());
+  std::uintptr_t request_focus = FocusedInputWindow();
   std::string raw_lang = ResolveTargetLang();
   // No-translate mode: skip LLM call when the lang picker selects "off".
   if (raw_lang == "none" || raw_lang == "None" || raw_lang == "no-translate" ||
@@ -713,9 +742,9 @@ void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
 
   // Spawn a worker without retaining `this`. The result is queued in shared
   // state and later consumed on Rime's input thread via the synthetic F24.
-  std::thread([state, this_id, activity_at_dispatch, request_window, chinese,
-               lang, system_prompt, api_key, model, endpoint, path, temp,
-               category]() {
+  std::thread([state, this_id, activity_at_dispatch, request_window,
+               request_focus, chinese, lang, system_prompt, api_key, model,
+               endpoint, path, temp, category]() {
     // Logging bundle — populated as we progress; dispatched on every exit
     // path via TranslateLog() (which is itself a detached thread, so no
     // disk I/O blocks the IME hot path).
@@ -756,18 +785,21 @@ void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
             << "]}";
 
     int http_status = 0;
+    DWORD network_error = ERROR_SUCCESS;
     std::string body = WinHttpPost(Utf8ToWide(endpoint),
                                    Utf8ToWide(path),
                                    api_key, payload.str(), 15000,
-                                   &http_status);
+                                   &http_status, &network_error);
     log_rec.http_status = http_status;
+    log_rec.network_error = network_error;
     log_rec.response    = body;
 
     // If user dispatched another translation since we started, abort.
     if (!state->alive.load() || this_id != state->request_id.load() ||
         activity_at_dispatch != state->activity_id.load() ||
         request_window !=
-            reinterpret_cast<std::uintptr_t>(GetForegroundWindow())) {
+            reinterpret_cast<std::uintptr_t>(GetForegroundWindow()) ||
+        request_focus != FocusedInputWindow()) {
       log_rec.result = "superseded";
       TranslateLog(std::move(log_rec));
       return;
@@ -813,6 +845,7 @@ void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
       state->pending_request_id = this_id;
       state->pending_activity_id = activity_at_dispatch;
       state->pending_window = request_window;
+      state->pending_focus = request_focus;
       state->pending_original = chinese;
       state->pending_result = english;
       state->pending_ready = true;

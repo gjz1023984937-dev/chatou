@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 env:
-  CHATOU_VERSION: "0.8.8"
+  CHATOU_VERSION: "0.8.9"
   LIBRIME_VERSION: "1.13.1"
   BOOST_VERSION: "1.84.0"
   BOOST_ARCHIVE_VERSION: "1_84_0"
