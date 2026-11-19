@@ -94,6 +94,18 @@ bool ReplaceWithKeyboardInput(const std::wstring& expected,
   std::vector<INPUT> inputs;
   inputs.reserve(sourceCharacters * 2 + replacement.size() * 2);
 
+  // Ctrl+Z invokes this path while Ctrl is physically held. Neutralize held
+  // modifiers for the replacement, otherwise VK_BACK becomes Ctrl+Backspace
+  // and Unicode input can be interpreted as shortcuts by the host.
+  std::vector<WORD> heldModifiers;
+  for (WORD key : {VK_LCONTROL, VK_RCONTROL, VK_LMENU, VK_RMENU,
+                   VK_LSHIFT, VK_RSHIFT}) {
+    if (GetAsyncKeyState(key) & 0x8000) {
+      heldModifiers.push_back(key);
+      AppendVirtualKey(&inputs, key, KEYEVENTF_KEYUP);
+    }
+  }
+
   // Custom editors such as WeChat's chat box do not honor synthetic Shift as
   // a selection modifier: Shift+Left moves the caret to the start and the
   // replacement is then inserted before the source (for example Hello你好).
@@ -108,6 +120,9 @@ bool ReplaceWithKeyboardInput(const std::wstring& expected,
     AppendUnicode(&inputs, ch);
     AppendUnicode(&inputs, ch, KEYEVENTF_KEYUP);
   }
+
+  for (WORD key : heldModifiers)
+    AppendVirtualKey(&inputs, key);
 
   return !inputs.empty() &&
          SendInput(static_cast<UINT>(inputs.size()), inputs.data(),

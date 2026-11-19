@@ -214,24 +214,34 @@ std::string WinHttpPost(const std::wstring& host,
                         const std::string& bearer_token,
                         const std::string& body,
                         DWORD timeout_ms = 15000,
-                        int* status_code = nullptr) {
+                        int* status_code = nullptr,
+                        DWORD* network_error = nullptr) {
   if (status_code) *status_code = 0;
+  if (network_error) *network_error = ERROR_SUCCESS;
   HINTERNET h_session = WinHttpOpen(L"TypeAnything/1.0",
-                                    WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                    WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                     WINHTTP_NO_PROXY_NAME,
                                     WINHTTP_NO_PROXY_BYPASS, 0);
-  if (!h_session) return "";
+  if (!h_session) {
+    if (network_error) *network_error = GetLastError();
+    return "";
+  }
   WinHttpSetTimeouts(h_session, timeout_ms, timeout_ms, timeout_ms, timeout_ms);
 
   HINTERNET h_conn = WinHttpConnect(h_session, host.c_str(),
                                     INTERNET_DEFAULT_HTTPS_PORT, 0);
-  if (!h_conn) { WinHttpCloseHandle(h_session); return ""; }
+  if (!h_conn) {
+    if (network_error) *network_error = GetLastError();
+    WinHttpCloseHandle(h_session);
+    return "";
+  }
 
   HINTERNET h_req = WinHttpOpenRequest(h_conn, L"POST", path.c_str(),
                                        nullptr, WINHTTP_NO_REFERER,
                                        WINHTTP_DEFAULT_ACCEPT_TYPES,
                                        WINHTTP_FLAG_SECURE);
   if (!h_req) {
+    if (network_error) *network_error = GetLastError();
     WinHttpCloseHandle(h_conn);
     WinHttpCloseHandle(h_session);
     return "";
@@ -248,7 +258,9 @@ std::string WinHttpPost(const std::wstring& host,
                                  (LPVOID)body.data(), (DWORD)body.size(),
                                  (DWORD)body.size(), 0);
   std::string result;
-  if (sent && WinHttpReceiveResponse(h_req, nullptr)) {
+  BOOL received = sent && WinHttpReceiveResponse(h_req, nullptr);
+  if (!received && network_error) *network_error = GetLastError();
+  if (received) {
     if (status_code) {
       DWORD st = 0, slen = sizeof(st);
       WinHttpQueryHeaders(h_req,
@@ -288,6 +300,7 @@ struct TranslateLogRec {
   std::string path;
   std::string model;
   int         http_status = 0;
+  DWORD       network_error = ERROR_SUCCESS;
   std::string response;          // raw response body (will be truncated)
   std::string output;            // extracted translation
   std::string result;            // final outcome ("ok" / error message)
@@ -357,6 +370,7 @@ inline void TranslateLog(TranslateLogRec rec) {
       << " input[0..50]=\""
       << TLogTruncate(TLogOneLine(rec.input_text), 50, "...") << "\"\n"
       << "  http_status=" << rec.http_status << "\n"
+      << "  winhttp_error=" << rec.network_error << "\n"
       << "  response[0..500]="
       << TLogTruncate(TLogOneLine(rec.response), 500, "...(truncated)") << "\n"
       << "  parsed=" << TLogOneLine(rec.output) << "\n"
@@ -771,11 +785,13 @@ void TypeAnythingProcessor::DispatchTranslate(const std::string& chinese) {
             << "]}";
 
     int http_status = 0;
+    DWORD network_error = ERROR_SUCCESS;
     std::string body = WinHttpPost(Utf8ToWide(endpoint),
                                    Utf8ToWide(path),
                                    api_key, payload.str(), 15000,
-                                   &http_status);
+                                   &http_status, &network_error);
     log_rec.http_status = http_status;
+    log_rec.network_error = network_error;
     log_rec.response    = body;
 
     // If user dispatched another translation since we started, abort.

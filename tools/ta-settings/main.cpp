@@ -249,12 +249,11 @@ static std::string HttpsPost(const std::string& host, const std::string& path,
   std::wstring whost = Utf8ToWide(h);
   std::wstring wpath = Utf8ToWide(path.empty() ? "/v1/chat/completions" : path);
 
-  // NO_PROXY default access — AUTOMATIC_PROXY does WPAD auto-detect which
-  // can hang for many seconds on some networks. We talk to a public HTTPS
-  // endpoint; if a corporate proxy is required the user's WinINET settings
-  // still apply via the system default, but we avoid the WPAD stall.
+  // Use the current Windows user/system proxy configuration, including PAC.
+  // DEFAULT_PROXY reads the separate legacy WinHTTP configuration and can
+  // retain a stale proxy even after the user's proxy app has been closed.
   HINTERNET hSession = WinHttpOpen(L"Chatou-Classifier/1.0",
-                                   WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                   WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                    WINHTTP_NO_PROXY_NAME,
                                    WINHTTP_NO_PROXY_BYPASS, 0);
   if (!hSession) return fail("WinHttpOpen failed");
@@ -279,6 +278,7 @@ static std::string HttpsPost(const std::string& host, const std::string& path,
                                (LPVOID)body.data(), (DWORD)body.size(),
                                (DWORD)body.size(), 0);
   if (ok) ok = WinHttpReceiveResponse(hReq, NULL);
+  DWORD networkError = ok ? ERROR_SUCCESS : GetLastError();
   std::string resp;
   if (ok) {
     DWORD avail = 0;
@@ -300,7 +300,9 @@ static std::string HttpsPost(const std::string& host, const std::string& path,
   WinHttpCloseHandle(hReq);
   WinHttpCloseHandle(hConnect);
   WinHttpCloseHandle(hSession);
-  if (!ok) return fail("网络请求失败（检查网络 / 防火墙）");
+  if (!ok) return fail("网络请求失败，WinHTTP 错误码 " +
+                       std::to_string(networkError) +
+                       "（检查接口地址、Windows 代理和 DNS）");
   if (status == 401) return fail("HTTP 401 — API key 无效或未配置");
   if (status >= 400) return fail("HTTP " + std::to_string(status));
   return resp;
